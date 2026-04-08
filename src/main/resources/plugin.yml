@@ -4,7 +4,7 @@ main: ua.favn.baseManager.BaseManager
 api-version: '1.21'
 description: Location and waypoint management plugin for Minecraft
 author: favn
-softdepend: [ProtocolLib]
+softdepend: [ProtocolLib, Pl3xMap]
 
 commands:
   loc:

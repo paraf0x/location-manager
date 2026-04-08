@@ -9,6 +9,7 @@ import ua.favn.baseManager.compass.TrackingCompassManager;
 import ua.favn.baseManager.config.MessageManager;
 import ua.favn.baseManager.gui.AnvilSearchHandler;
 import ua.favn.baseManager.gui.GuiManager;
+import ua.favn.baseManager.map.Pl3xmapManager;
 import ua.favn.baseManager.location.LocationManager;
 import ua.favn.baseManager.lodestone.LodestoneListener;
 import ua.favn.baseManager.lodestone.LodestoneManager;
@@ -29,6 +30,7 @@ public class BaseManager extends JavaPlugin {
     private MessageManager messageManager;
     private GuiManager guiManager;
     private AnvilSearchHandler anvilSearchHandler;
+    private Pl3xmapManager pl3xmapManager;
 
     @Override
     public void onEnable() {
@@ -57,6 +59,13 @@ public class BaseManager extends JavaPlugin {
         this.getServer().getPluginManager().registerEvents(this.compassListener, this);
         this.getServer().getPluginManager().registerEvents(new LodestoneListener(this), this);
 
+        // Initialize optional integrations
+        if (getServer().getPluginManager().isPluginEnabled("Pl3xMap")) {
+            this.pl3xmapManager = new Pl3xmapManager(this);
+        } else {
+            this.getLogger().info("Pl3xMap not found - map markers disabled.");
+        }
+
         // Register commands
         new BaseCommand(this);
 
@@ -65,6 +74,9 @@ public class BaseManager extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (this.pl3xmapManager != null) {
+            this.pl3xmapManager.cleanup();
+        }
         if (this.glowManager != null) {
             this.glowManager.cleanup();
         }
@@ -111,5 +123,9 @@ public class BaseManager extends JavaPlugin {
 
     public AnvilSearchHandler getAnvilSearchHandler() {
         return this.anvilSearchHandler;
+    }
+
+    public Pl3xmapManager getPl3xmapManager() {
+        return this.pl3xmapManager;
     }
 }

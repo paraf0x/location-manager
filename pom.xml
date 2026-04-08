@@ -52,6 +52,10 @@
             <id>codemc</id>
             <url>https://repo.codemc.io/repository/maven-public/</url>
         </repository>
+        <repository>
+            <id>modrinth</id>
+            <url>https://api.modrinth.com/maven</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -77,6 +81,14 @@
             <artifactId>anvilgui</artifactId>
             <version>1.10.11-SNAPSHOT</version>
             <scope>compile</scope>
+        </dependency>
+
+        <!-- Pl3xMap (web map integration) -->
+        <dependency>
+            <groupId>maven.modrinth</groupId>
+            <artifactId>pl3xmap</artifactId>
+            <version>1.21.11-544</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- ProtocolLib (per-player packets) -->

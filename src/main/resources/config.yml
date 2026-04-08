@@ -42,3 +42,23 @@ lodestone:
   allowed-tags: []
   # Maximum blocks to scan for player-head structure above lodestone (0 = disabled)
   structure-scan-max-blocks: 128
+
+# Pl3xMap web map integration
+pl3xmap:
+  # Enable marker display on Pl3xMap
+  enabled: true
+  # Layer label shown in Pl3xMap control panel
+  layer-label: "Bases"
+  # Show only public locations (true) or all locations (false)
+  public-only: true
+  # Marker icon size in pixels
+  icon-size: 24
+  # Tooltip HTML template
+  # Placeholders: {name}, {tag}, {coords}, {owner}
+  tooltip: |
+    <div style="text-align:center;">
+      <b style="font-size:13px;color:#f5a623;">{name}</b>
+      <br><span style="color:#aaa;font-size:11px;">{tag}</span>
+      <br><span style="font-size:11px;">{coords}</span>
+      <br><span style="color:#8bc34a;font-size:11px;">{owner}</span>
+    </div>

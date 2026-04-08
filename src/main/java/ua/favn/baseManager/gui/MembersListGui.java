@@ -52,7 +52,7 @@ public class MembersListGui extends PagedGuiInventory<UUID> {
         ItemStack bg = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         bg.editMeta(meta -> meta.setHideTooltip(true));
         this.setBackground(bg);
-        ItemStack ol = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemStack ol = new ItemStack(Material.ORANGE_STAINED_GLASS_PANE);
         ol.editMeta(meta -> meta.setHideTooltip(true));
         this.setOutline(ol, OutlineType.BOTTOM);
 

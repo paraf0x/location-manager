@@ -230,7 +230,7 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
     }
 
     private ItemStack createOutline() {
-        ItemStack item = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemStack item = new ItemStack(Material.ORANGE_STAINED_GLASS_PANE);
         item.editMeta(meta -> meta.setHideTooltip(true));
         return item;
     }

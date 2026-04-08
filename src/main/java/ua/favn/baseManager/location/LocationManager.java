@@ -282,6 +282,9 @@ public class LocationManager extends Base {
         if (ownerList != null) {
             ownerList.remove(loc);
         }
+        if (getPlugin().getPl3xmapManager() != null) {
+            getPlugin().getPl3xmapManager().refreshMarkers();
+        }
     }
 
     // Public API
@@ -293,6 +296,9 @@ public class LocationManager extends Base {
         SavedLocation loc = new SavedLocation(this, owner, tag, name, location);
         loc.save();
         addToCache(loc);
+        if (getPlugin().getPl3xmapManager() != null) {
+            getPlugin().getPl3xmapManager().refreshMarkers();
+        }
         return loc;
     }
 
