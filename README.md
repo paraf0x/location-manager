@@ -33,7 +33,7 @@ Players create locations by placing a sign on a lodestone and waxing it with hon
 
 ```mermaid
 flowchart TD
-    Start([Player at Lodestone]) --> PlaceSign[Place sign on lodestone]
+    Start([Player places a Lodestone]) --> PlaceSign[Place sign on lodestone]
     PlaceSign --> SetTag["Line 1: Tag (e.g. team name)"]
     SetTag --> SetName["Lines 2-4: Location name"]
     SetName --> AddFrame["Place item frame on lodestone\nwith a banner, head, or any item\n(recommended for easy identification)"]
@@ -48,6 +48,8 @@ flowchart TD
     Link --> Registered
 
     Registered --> Use
+    Registered --> Edit
+    Registered --> Delete
 
     subgraph Use [Usage]
         GUI["GUI Browser\n/loc"]
@@ -57,7 +59,15 @@ flowchart TD
         Compass --> Glow
     end
 
-    Registered --> Delete
+    subgraph Edit ["Editing (name or icon)"]
+        BreakSignEdit["Break the sign"] --> NewSign["Place new sign\nwith updated name"]
+        NewSign --> SwapIcon{Change icon?}
+        SwapIcon -->|Yes| SwapItem["Swap item in frame"]
+        SwapIcon -->|No| KeepFrame["Keep existing frame"]
+        SwapItem --> ReWax["Wax sign"]
+        KeepFrame --> ReWax
+        ReWax --> Registered2((Re-registered))
+    end
 
     subgraph Delete [Deletion]
         BreakLodestone["Break lodestone"] --> Removed
@@ -66,35 +76,16 @@ flowchart TD
     end
 
     style Registered fill:#4a9,stroke:#333,color:#fff
+    style Registered2 fill:#4a9,stroke:#333,color:#fff
     style Removed fill:#c44,stroke:#333,color:#fff
     style Block fill:#c44,stroke:#333,color:#fff
 ```
 
-## Editing a Location
-
-To change the name or icon of an existing location, destroy and re-create it:
-
-```mermaid
-flowchart TD
-    Edit([Want to edit\nname or icon?]) --> Break["Break the sign\n(location is deleted)"]
-    Break --> NewSign["Place new sign on\nthe same lodestone"]
-    NewSign --> NewTag["Line 1: Same or new tag"]
-    NewTag --> NewName["Lines 2-4: New name"]
-    NewName --> NewIcon{Change icon?}
-    NewIcon -->|Yes| SwapItem["Swap item in frame\nor place new frame"]
-    NewIcon -->|No| KeepFrame["Keep existing frame as-is"]
-    SwapItem --> ReWax
-    KeepFrame --> ReWax
-    ReWax["Wax sign with honeycomb"] --> Done((Location\nRe-registered))
-
-    style Done fill:#4a9,stroke:#333,color:#fff
-```
-
-Since signs are waxed (locked) after registration, editing requires breaking the sign to delete the location, then re-registering with updated details. The lodestone and item frame can stay in place - only the sign needs to be replaced.
+Since signs are waxed (locked) after registration, editing requires breaking the sign to delete the location, then placing a new sign with updated details and waxing again. The lodestone and item frame can stay in place.
 
 ## Cross-Dimension Compass
 
-When a location has coordinates in both Overworld and Nether, the tracking compass automatically switches between them:
+Locations can span multiple dimensions. To link Overworld and Nether, register a lodestone in each dimension **using the same tag and name**. The compass then automatically switches between them:
 
 - **In Overworld**: Compass points to the Overworld coordinates, action bar shows distance
 - **Enter Nether portal**: Compass needle updates to point to the Nether coordinates
@@ -104,11 +95,30 @@ When a location has coordinates in both Overworld and Nether, the tracking compa
 Auto-dispose only triggers in the **origin dimension** (where you got the compass). Walking past a Nether portal won't accidentally consume your compass.
 
 ```mermaid
-flowchart LR
-    OW["Overworld\nCompass points to OW coords"] -->|Enter Nether| NE["Nether\nCompass points to Nether coords"]
-    NE -->|Return to Overworld| OW
-    NE -->|No Nether coords| Spin["Compass spins\n'No base here'"]
+flowchart TD
+    subgraph Setup ["Setup: same tag + name in both dimensions"]
+        OW_Setup["Overworld lodestone\n[WOLVES] Main Base\n→ wax"] --> Linked((WOLVES:Main Base\nlinked location))
+        NE_Setup["Nether lodestone\n[WOLVES] Main Base\n→ wax"] --> Linked
+    end
+
+    Linked --> Compass["Get compass"]
+
+    Compass --> OW_Use["In Overworld\nPoints to OW coords"]
+    OW_Use -->|Enter Nether| NE_Use["In Nether\nPoints to Nether coords"]
+    NE_Use -->|Return to Overworld| OW_Use
+    NE_Use -->|No Nether coords| Spin["Compass spins\n'No base here'"]
+
+    style Linked fill:#4a9,stroke:#333,color:#fff
 ```
+
+## Icon Behavior
+
+The location icon (displayed in the GUI) is taken from the **item frame on the lodestone at the time of waxing**. When a location spans multiple dimensions:
+
+- The icon is set when **first registered** (first wax with an item frame)
+- Waxing a second lodestone (in another dimension) with a different item frame **overwrites** the icon
+- The **last waxed** lodestone's item frame wins
+- If no item frame is present during waxing, the existing icon is kept
 
 ## Sign Format
 
