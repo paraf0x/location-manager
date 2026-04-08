@@ -13,6 +13,8 @@ commands:
   icon-changed: "&aIcon for &e{name}&a changed to &b{icon}&a!"
   member-added: "&a{player}&a has been added as a member of &b[{tag}] &e{name}&a!"
   member-removed: "&c{player}&c has been removed from &b[{tag}] &e{name}&c."
+  location-shared: "&e{player} &ashared location &b[{tag}] &e{name}&a with you!"
+  location-share-sent: "&aLocation &b[{tag}] &e{name}&a shared with &e{player}&a!"
 
 # Compass messages
 compass:

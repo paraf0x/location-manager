@@ -9,7 +9,11 @@ import java.util.List;
 import java.util.UUID;
 import me.lucko.commodore.Commodore;
 import me.lucko.commodore.CommodoreProvider;
+import java.time.Duration;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickCallback;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -56,8 +60,9 @@ public class BaseCommand extends TabCompleteCommand {
 
         String subcommand = args[0].toLowerCase();
 
-        // All subcommands except gui require admin permission
+        // All subcommands except gui and share require admin permission
         if (!subcommand.equals("gui") && !subcommand.equals("menu")
+                && !subcommand.equals("share")
                 && !player.hasPermission(ADMIN_PERMISSION)) {
             player.sendMessage(Component.text("You don't have permission!", Colors.RED));
             return true;
@@ -70,6 +75,7 @@ public class BaseCommand extends TabCompleteCommand {
             case "compass" -> handleCompass(player, args);
             case "icon" -> handleIcon(player, args);
             case "member" -> handleMember(player, args);
+            case "share" -> handleShare(player, args);
             case "reload" -> handleReload(player);
             default -> {
                 player.sendMessage(Component.text("Unknown subcommand. Use /loc for GUI.", Colors.RED));
@@ -264,6 +270,73 @@ public class BaseCommand extends TabCompleteCommand {
         });
     }
 
+    private void handleShare(Player player, String[] args) {
+        if (Predicate.check(args.length < 4, player, "Usage: /loc share <tag> <name> <player>")) {
+            return;
+        }
+
+        String tag = args[1].toUpperCase();
+        String name = args[2];
+        String targetName = args[3];
+
+        SavedLocation loc = getPlugin().getLocationManager().getByTagAndName(tag, name);
+        if (Predicate.check(loc == null, player, "Location not found: " + tag + ":" + name)) {
+            return;
+        }
+
+        if (!getPlugin().getLocationManager().canAccess(loc, player.getUniqueId())
+                && !player.hasPermission(ADMIN_PERMISSION)) {
+            player.sendMessage(Component.text("You don't have access to this location!", Colors.RED));
+            return;
+        }
+
+        Player recipient = Bukkit.getPlayerExact(targetName);
+        if (Predicate.check(recipient == null, player, "Player not found: " + targetName)) {
+            return;
+        }
+
+        int locationId = loc.id();
+        Component hoverText = Component.text(loc.displayName(), Colors.GOLD)
+            .append(Component.newline())
+            .append(Component.text(loc.coordsString(), Colors.SILVER))
+            .append(Component.newline())
+            .append(Component.text("Click to receive a tracking compass", Colors.LIGHT_GREEN));
+
+        Component clickable = Component.text("[Click for Compass]", Colors.LIGHT_GREEN)
+            .hoverEvent(HoverEvent.showText(hoverText))
+            .clickEvent(ClickEvent.callback(audience -> {
+                if (!(audience instanceof Player clicker)) {
+                    return;
+                }
+                SavedLocation target = getPlugin().getLocationManager().get(locationId);
+                if (target == null) {
+                    clicker.sendMessage(Component.text("This location no longer exists!", Colors.RED));
+                    return;
+                }
+                ItemStack compass = getPlugin().getCompassManager().createCompass(target, clicker);
+                clicker.getInventory().addItem(compass);
+                getPlugin().getCompassListener().tryStartActionBar(clicker);
+                getPlugin().getMessageManager().send(clicker, "commands.compass-given",
+                    new FormatUtil.Format("{tag}", target.tag()),
+                    new FormatUtil.Format("{name}", target.name()));
+            }, ClickCallback.Options.builder()
+                .uses(ClickCallback.UNLIMITED_USES)
+                .lifetime(Duration.ofHours(1))
+                .build()));
+
+        Component message = getPlugin().getMessageManager().get("commands.location-shared",
+            new FormatUtil.Format("{player}", player.getName()),
+            new FormatUtil.Format("{tag}", tag),
+            new FormatUtil.Format("{name}", name));
+
+        Component fullMessage = message.append(Component.space()).append(clickable);
+        getPlugin().getMessageManager().sendRaw(recipient, fullMessage);
+        getPlugin().getMessageManager().send(player, "commands.location-share-sent",
+            new FormatUtil.Format("{player}", recipient.getName()),
+            new FormatUtil.Format("{tag}", tag),
+            new FormatUtil.Format("{name}", name));
+    }
+
     private void handleReload(Player player) {
         if (!player.hasPermission("basemanager.reload")) {
             player.sendMessage(Component.text("You don't have permission to reload the config!", Colors.RED));
@@ -282,7 +355,7 @@ public class BaseCommand extends TabCompleteCommand {
         }
 
         if (args.length == 1) {
-            List<String> subcommands = new ArrayList<>(List.of("gui", "menu"));
+            List<String> subcommands = new ArrayList<>(List.of("gui", "menu", "share"));
             if (player.hasPermission(ADMIN_PERMISSION)) {
                 subcommands.addAll(List.of("save", "delete", "list", "compass", "icon", "member"));
             }
@@ -294,11 +367,37 @@ public class BaseCommand extends TabCompleteCommand {
                 .toList();
         }
 
-        if (!player.hasPermission(ADMIN_PERMISSION)) {
+        String sub = args[0].toLowerCase();
+
+        // Share tab completion is available to all players
+        if (sub.equals("share")) {
+            if (args.length == 2) {
+                return getPlugin().getLocationManager().getAll().stream()
+                    .map(SavedLocation::tag)
+                    .distinct()
+                    .filter(t -> t.toLowerCase().startsWith(args[1].toLowerCase()))
+                    .toList();
+            }
+            if (args.length == 3) {
+                String tag = args[1].toUpperCase();
+                return getPlugin().getLocationManager().getAll().stream()
+                    .filter(l -> l.tag().equalsIgnoreCase(tag))
+                    .map(SavedLocation::name)
+                    .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
+                    .toList();
+            }
+            if (args.length == 4) {
+                return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(args[3].toLowerCase()))
+                    .toList();
+            }
             return List.of();
         }
 
-        String sub = args[0].toLowerCase();
+        if (!player.hasPermission(ADMIN_PERMISSION)) {
+            return List.of();
+        }
 
         // Member subcommand has shifted positions: member <add|remove> <tag> <name> <player>
         if (sub.equals("member")) {
@@ -388,6 +487,10 @@ public class BaseCommand extends TabCompleteCommand {
                     .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
                         .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
                             .then(RequiredArgumentBuilder.argument("player", StringArgumentType.string()))))))
+            .then(LiteralArgumentBuilder.literal("share")
+                .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
+                    .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
+                        .then(RequiredArgumentBuilder.argument("player", StringArgumentType.string())))))
             .then(LiteralArgumentBuilder.literal("gui"))
             .then(LiteralArgumentBuilder.literal("menu"))
             .build();
