@@ -1,14 +1,18 @@
 package ua.favn.baseManager.gui;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import ua.favn.baseManager.BaseManager;
 import ua.favn.baseManager.base.gui.GuiButton;
 import ua.favn.baseManager.base.gui.GuiInventory;
@@ -23,11 +27,21 @@ import ua.favn.baseManager.location.SavedLocation;
 public class LocationDetailsGui extends GuiInventory {
     private final Player player;
     private final SavedLocation location;
+    private Map<UUID, String> memberNames = new LinkedHashMap<>();
 
     public LocationDetailsGui(BaseManager plugin, Player player, SavedLocation location) {
         super(plugin);
         this.player = player;
         this.location = location;
+    }
+
+    /**
+     * Opens the details GUI with member names loaded from database.
+     */
+    public static void openAsync(BaseManager plugin, Player player, SavedLocation location) {
+        LocationDetailsGui gui = new LocationDetailsGui(plugin, player, location);
+        gui.memberNames = plugin.getLocationManager().getMemberManager().getMembers(location.id());
+        gui.open(player);
     }
 
     @Override
@@ -57,23 +71,61 @@ public class LocationDetailsGui extends GuiInventory {
             this.getSlot(4, 3)
         ));
 
-        // Delete button (available to all)
-        this.registerTempButton(new GuiButton(
-            createSimpleItem(Material.BARRIER,
-                Component.text("Delete Location", Colors.RED),
-                Component.text("Shift+Click to delete", Colors.SILVER)),
-            (GuiButton.CompleteButtonAction) (clicker, actionInfo) -> {
-                if (actionInfo.click() != null && actionInfo.click().isShiftClick()) {
-                    location.delete();
-                    player.closeInventory();
-                    getPlugin().getMessageManager().send(player, "commands.location-deleted",
-                        new FormatUtil.Format("{tag}", location.tag()),
-                        new FormatUtil.Format("{name}", location.name()));
-                }
-                return GuiButton.ActionResult.EMPTY;
-            },
-            this.getSlot(6, 3)
-        ));
+        // Members section (row 4)
+        List<UUID> memberList = new ArrayList<>(memberNames.keySet());
+
+        if (!memberList.isEmpty()) {
+            // Members label
+            this.setItem(1, 4, createSimpleItem(Material.OAK_SIGN,
+                Component.text("Members (" + memberList.size() + ")", Colors.GOLD)));
+        }
+
+        int maxDisplay = Math.min(memberList.size(), 7);
+        for (int i = 0; i < maxDisplay; i++) {
+            UUID memberUUID = memberList.get(i);
+            String memberName = memberNames.get(memberUUID);
+
+            List<Component> skullLore = new ArrayList<>();
+            skullLore.add(FormatUtil.normalize(Component.text("Member", Colors.SILVER)));
+            if (player.hasPermission("basemanager.admin")) {
+                skullLore.add(Component.empty());
+                skullLore.add(FormatUtil.normalize(Component.text("Shift+Click to remove", Colors.RED)));
+            }
+
+            ItemStack skull = createPlayerHead(memberName, skullLore);
+
+            final UUID capturedUUID = memberUUID;
+            final String capturedName = memberName;
+            this.registerTempButton(new GuiButton(
+                skull,
+                (GuiButton.CompleteButtonAction) (clicker, actionInfo) -> {
+                    if (actionInfo.click() != null && actionInfo.click().isShiftClick()
+                            && player.hasPermission("basemanager.admin")) {
+                        getPlugin().getLocationManager().getMemberManager()
+                            .removeMember(location.id(), capturedUUID);
+                        getPlugin().getMessageManager().send(player, "commands.member-removed",
+                            new FormatUtil.Format("{player}", capturedName),
+                            new FormatUtil.Format("{tag}", location.tag()),
+                            new FormatUtil.Format("{name}", location.name()));
+                        // Rebuild to reflect change
+                        this.build();
+                    }
+                    return GuiButton.ActionResult.EMPTY;
+                },
+                this.getSlot(i + 2, 4)
+            ));
+        }
+
+        // "View All" arrow if more than 7 members
+        if (memberList.size() > 7) {
+            this.registerTempButton(new GuiButton(
+                createSimpleItem(Material.ARROW,
+                    Component.text("View All Members", Colors.GOLD),
+                    Component.text(memberList.size() + " total members", Colors.SILVER)),
+                clicker -> getPlugin().getGuiManager().openMembersList(player, location),
+                this.getSlot(9, 4)
+            ));
+        }
 
         // Back button
         this.registerTempButton(new GuiButton(
@@ -81,8 +133,21 @@ public class LocationDetailsGui extends GuiInventory {
                 Component.text("Back", Colors.WHITE),
                 Component.text("Return to location browser", Colors.SILVER)),
             clicker -> getPlugin().getGuiManager().openLocationBrowser(player),
-            this.getSlot(1, 5)
+            this.getSlot(1, 6)
         ));
+    }
+
+    private ItemStack createPlayerHead(String name, List<Component> lore) {
+        ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) skull.getItemMeta();
+        // Use name-based lookup - works with both online and offline mode
+        @SuppressWarnings("deprecation")
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(name);
+        meta.setOwningPlayer(offlinePlayer);
+        meta.displayName(FormatUtil.normalize(Component.text(name, Colors.GOLD)));
+        meta.lore(lore);
+        skull.setItemMeta(meta);
+        return skull;
     }
 
     private ItemStack createLocationInfoItem() {
@@ -143,6 +208,6 @@ public class LocationDetailsGui extends GuiInventory {
 
     @Override
     public int getHeight() {
-        return 5;
+        return 6;
     }
 }

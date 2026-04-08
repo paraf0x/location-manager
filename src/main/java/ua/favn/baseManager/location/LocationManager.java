@@ -25,6 +25,7 @@ public class LocationManager extends Base {
     private final Map<Integer, SavedLocation> cacheById = new HashMap<>();
     private final Map<UUID, List<SavedLocation>> cacheByOwner = new HashMap<>();
     private ShareManager shareManager;
+    private MemberManager memberManager;
 
     public LocationManager(BaseManager plugin) {
         super(plugin);
@@ -34,6 +35,7 @@ public class LocationManager extends Base {
         createTables();
         migrateData();
         this.shareManager = new ShareManager(this);
+        this.memberManager = new MemberManager(this);
         fetchAll();
     }
 
@@ -77,7 +79,26 @@ public class LocationManager extends Base {
                 )
                 """);
 
+            // Members table
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS location_members (
+                    locationId INTEGER NOT NULL,
+                    memberUUID TEXT NOT NULL,
+                    memberName TEXT NOT NULL,
+                    PRIMARY KEY (locationId, memberUUID),
+                    FOREIGN KEY (locationId) REFERENCES locations(id) ON DELETE CASCADE
+                )
+                """);
+
+            // Add memberName column if missing (migration for existing tables)
+            try {
+                stmt.execute("ALTER TABLE location_members ADD COLUMN memberName TEXT NOT NULL DEFAULT ''");
+            } catch (SQLException ignored) {
+                // Column already exists
+            }
+
             // Indexes
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_location_members ON location_members(locationId)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_locations_owner ON locations(owner)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_locations_tag_name ON locations(owner, tag, name)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_location_coords ON location_coords(locationId)");
@@ -381,5 +402,9 @@ public class LocationManager extends Base {
 
     public ShareManager getShareManager() {
         return shareManager;
+    }
+
+    public MemberManager getMemberManager() {
+        return memberManager;
     }
 }

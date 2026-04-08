@@ -11,6 +11,8 @@ commands:
   location-deleted: "&cLocation &b[{tag}] &e{name}&c has been deleted."
   compass-given: "&aYou received a compass pointing to &b[{tag}] &e{name}&a!"
   icon-changed: "&aIcon for &e{name}&a changed to &b{icon}&a!"
+  member-added: "&a{player}&a has been added as a member of &b[{tag}] &e{name}&a!"
+  member-removed: "&c{player}&c has been removed from &b[{tag}] &e{name}&c."
 
 # Compass messages
 compass:

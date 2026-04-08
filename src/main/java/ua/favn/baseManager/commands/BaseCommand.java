@@ -6,6 +6,7 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import me.lucko.commodore.Commodore;
 import me.lucko.commodore.CommodoreProvider;
 import net.kyori.adventure.text.Component;
@@ -23,6 +24,7 @@ import ua.favn.baseManager.base.util.Colors;
 import ua.favn.baseManager.base.util.FormatUtil;
 import ua.favn.baseManager.base.util.ItemStackSerializer;
 import ua.favn.baseManager.base.util.Predicate;
+import ua.favn.baseManager.location.MemberManager;
 import ua.favn.baseManager.location.SavedLocation;
 
 /**
@@ -67,6 +69,7 @@ public class BaseCommand extends TabCompleteCommand {
             case "list" -> handleList(player, args);
             case "compass" -> handleCompass(player, args);
             case "icon" -> handleIcon(player, args);
+            case "member" -> handleMember(player, args);
             case "reload" -> handleReload(player);
             default -> {
                 player.sendMessage(Component.text("Unknown subcommand. Use /loc for GUI.", Colors.RED));
@@ -203,6 +206,64 @@ public class BaseCommand extends TabCompleteCommand {
             new FormatUtil.Format("{icon}", materialName));
     }
 
+    private void handleMember(Player player, String[] args) {
+        if (Predicate.check(args.length < 5, player,
+            "Usage: /loc member <add|remove> <tag> <name> <player>")) {
+            return;
+        }
+
+        String action = args[1].toLowerCase();
+        String tag = args[2].toUpperCase();
+        String name = args[3];
+        String targetName = args[4];
+
+        SavedLocation loc = getPlugin().getLocationManager().getByTagAndName(tag, name);
+        if (Predicate.check(loc == null, player, "Location not found: " + tag + ":" + name)) {
+            return;
+        }
+
+        MemberManager memberManager = getPlugin().getLocationManager().getMemberManager();
+
+        // Resolve player async via Mojang profile API
+        Bukkit.getScheduler().runTaskAsynchronously(getPlugin(), () -> {
+            com.destroystokyo.paper.profile.PlayerProfile profile =
+                Bukkit.createProfile(targetName);
+            profile.complete(true);
+
+            // Use profile UUID if resolved, otherwise fall back to offline UUID
+            @SuppressWarnings("deprecation")
+            UUID targetUUID = profile.getId() != null
+                ? profile.getId() : Bukkit.getOfflinePlayer(targetName).getUniqueId();
+            String resolvedName = profile.getName() != null ? profile.getName() : targetName;
+
+            Bukkit.getScheduler().runTask(getPlugin(), () -> {
+                switch (action) {
+                    case "add" -> {
+                        memberManager.addMember(loc.id(), targetUUID, resolvedName);
+                        getPlugin().getMessageManager().send(player, "commands.member-added",
+                            new FormatUtil.Format("{player}", resolvedName),
+                            new FormatUtil.Format("{tag}", tag),
+                            new FormatUtil.Format("{name}", name));
+                    }
+                    case "remove" -> {
+                        boolean removed = memberManager.removeMember(loc.id(), targetUUID);
+                        if (removed) {
+                            getPlugin().getMessageManager().send(player, "commands.member-removed",
+                                new FormatUtil.Format("{player}", resolvedName),
+                                new FormatUtil.Format("{tag}", tag),
+                                new FormatUtil.Format("{name}", name));
+                        } else {
+                            player.sendMessage(Component.text(
+                                resolvedName + " is not a member of this location.", Colors.RED));
+                        }
+                    }
+                    default -> player.sendMessage(Component.text(
+                        "Usage: /loc member <add|remove> <tag> <name> <player>", Colors.RED));
+                }
+            });
+        });
+    }
+
     private void handleReload(Player player) {
         if (!player.hasPermission("basemanager.reload")) {
             player.sendMessage(Component.text("You don't have permission to reload the config!", Colors.RED));
@@ -223,7 +284,7 @@ public class BaseCommand extends TabCompleteCommand {
         if (args.length == 1) {
             List<String> subcommands = new ArrayList<>(List.of("gui", "menu"));
             if (player.hasPermission(ADMIN_PERMISSION)) {
-                subcommands.addAll(List.of("save", "delete", "list", "compass", "icon"));
+                subcommands.addAll(List.of("save", "delete", "list", "compass", "icon", "member"));
             }
             if (player.hasPermission("basemanager.reload")) {
                 subcommands.add("reload");
@@ -238,6 +299,37 @@ public class BaseCommand extends TabCompleteCommand {
         }
 
         String sub = args[0].toLowerCase();
+
+        // Member subcommand has shifted positions: member <add|remove> <tag> <name> <player>
+        if (sub.equals("member")) {
+            if (args.length == 2) {
+                return List.of("add", "remove").stream()
+                    .filter(a -> a.startsWith(args[1].toLowerCase()))
+                    .toList();
+            }
+            if (args.length == 3) {
+                return getPlugin().getLocationManager().getAll().stream()
+                    .map(SavedLocation::tag)
+                    .distinct()
+                    .filter(t -> t.toLowerCase().startsWith(args[2].toLowerCase()))
+                    .toList();
+            }
+            if (args.length == 4) {
+                String tag = args[2].toUpperCase();
+                return getPlugin().getLocationManager().getAll().stream()
+                    .filter(l -> l.tag().equalsIgnoreCase(tag))
+                    .map(SavedLocation::name)
+                    .filter(n -> n.toLowerCase().startsWith(args[3].toLowerCase()))
+                    .toList();
+            }
+            if (args.length == 5) {
+                return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(args[4].toLowerCase()))
+                    .toList();
+            }
+            return List.of();
+        }
 
         // arg[1] = tag
         if (args.length == 2 && needsTag(sub)) {
@@ -287,6 +379,15 @@ public class BaseCommand extends TabCompleteCommand {
                 .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
                     .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
                         .then(RequiredArgumentBuilder.argument("material", StringArgumentType.string())))))
+            .then(LiteralArgumentBuilder.literal("member")
+                .then(LiteralArgumentBuilder.literal("add")
+                    .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
+                        .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
+                            .then(RequiredArgumentBuilder.argument("player", StringArgumentType.string())))))
+                .then(LiteralArgumentBuilder.literal("remove")
+                    .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
+                        .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
+                            .then(RequiredArgumentBuilder.argument("player", StringArgumentType.string()))))))
             .then(LiteralArgumentBuilder.literal("gui"))
             .then(LiteralArgumentBuilder.literal("menu"))
             .build();

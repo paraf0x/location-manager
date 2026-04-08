@@ -32,6 +32,13 @@ public class GuiManager extends Base {
      * Opens the location details GUI.
      */
     public void openLocationDetails(Player player, SavedLocation location) {
-        new LocationDetailsGui(getPlugin(), player, location).open(player);
+        LocationDetailsGui.openAsync(getPlugin(), player, location);
+    }
+
+    /**
+     * Opens the members list GUI for a location.
+     */
+    public void openMembersList(Player player, SavedLocation location) {
+        MembersListGui.openAsync(getPlugin(), player, location);
     }
 }
