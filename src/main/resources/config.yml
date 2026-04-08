@@ -51,8 +51,10 @@ pl3xmap:
   layer-label: "Bases"
   # Show only public locations (true) or all locations (false)
   public-only: true
-  # Marker icon size in pixels
+  # Marker icon size in pixels (square icons like blocks and heads)
   icon-size: 24
+  # Banner icon width in pixels (height is automatically 2x width)
+  banner-icon-width: 24
   # Tooltip HTML template
   # Placeholders: {name}, {tag}, {coords}, {owner}
   tooltip: |

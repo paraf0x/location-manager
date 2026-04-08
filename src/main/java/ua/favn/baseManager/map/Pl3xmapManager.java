@@ -1,5 +1,6 @@
 package ua.favn.baseManager.map;
 
+import java.awt.AlphaComposite;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -20,8 +21,11 @@ import net.pl3x.map.core.markers.option.Options;
 import net.pl3x.map.core.markers.option.Tooltip;
 import net.pl3x.map.core.world.World;
 import org.bukkit.Bukkit;
+import org.bukkit.DyeColor;
 import org.bukkit.Material;
+import org.bukkit.block.banner.Pattern;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BannerMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.profile.PlayerProfile;
 import ua.favn.baseManager.BaseManager;
@@ -104,6 +108,8 @@ public class Pl3xmapManager extends Base {
             if (iconItem != null) {
                 if (iconItem.getType() == Material.PLAYER_HEAD) {
                     ensureHeadIconRegistered(iconItem);
+                } else if (isBanner(iconItem.getType())) {
+                    ensureBannerIconRegistered(iconItem);
                 } else {
                     ensureIconRegistered(iconItem.getType());
                 }
@@ -184,6 +190,11 @@ public class Pl3xmapManager extends Base {
                 String headKey = getHeadIconKey(iconItem);
                 if (headKey != null) {
                     return headKey;
+                }
+            } else if (isBanner(iconItem.getType())) {
+                String bannerKey = getBannerIconKey(iconItem);
+                if (bannerKey != null && registeredIcons.contains(bannerKey)) {
+                    return bannerKey;
                 }
             } else {
                 String key = "basemanager_" + iconItem.getType().name().toLowerCase();
@@ -364,6 +375,146 @@ public class Pl3xmapManager extends Base {
         }
     }
 
+    // ── Banner rendering ─────────────────────────────────────────────────
+
+    private static final int BANNER_FACE_X = 1;
+    private static final int BANNER_FACE_Y = 1;
+    private static final int BANNER_FACE_W = 20;
+    private static final int BANNER_FACE_H = 40;
+
+    private static boolean isBanner(Material material) {
+        return material.name().endsWith("_BANNER");
+    }
+
+    private static DyeColor bannerBaseColor(Material material) {
+        String name = material.name().replace("_BANNER", "");
+        try {
+            return DyeColor.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return DyeColor.WHITE;
+        }
+    }
+
+    private String getBannerIconKey(ItemStack banner) {
+        DyeColor base = bannerBaseColor(banner.getType());
+        StringBuilder sb = new StringBuilder("basemanager_banner_").append(base.name().toLowerCase());
+        if (banner.getItemMeta() instanceof BannerMeta meta) {
+            for (Pattern p : meta.getPatterns()) {
+                sb.append('_').append(p.getPattern().getKey().getKey());
+                sb.append('_').append(p.getColor().name().toLowerCase());
+            }
+        }
+        return sb.toString();
+    }
+
+    private synchronized void ensureBannerIconRegistered(ItemStack banner) {
+        String iconKey = getBannerIconKey(banner);
+        if (registeredIcons.contains(iconKey)) {
+            return;
+        }
+
+        try {
+            DyeColor baseColor = bannerBaseColor(banner.getType());
+            List<Pattern> patterns = (banner.getItemMeta() instanceof BannerMeta meta)
+                    ? meta.getPatterns() : List.of();
+
+            BufferedImage image = renderBanner(baseColor, patterns);
+            if (image != null) {
+                File cacheFile = new File(iconCacheDir, iconKey + ".png");
+                ImageIO.write(image, "png", cacheFile);
+
+                IconImage iconImage = new IconImage(iconKey, image, "png");
+                Pl3xMap.api().getIconRegistry().register(iconKey, iconImage);
+                registeredIcons.add(iconKey);
+            }
+        } catch (Exception e) {
+            getPlugin().getLogger().warning("Failed to register banner icon: " + e.getMessage());
+        }
+    }
+
+    private BufferedImage renderBanner(DyeColor baseColor, List<Pattern> patterns) {
+        BufferedImage canvas = new BufferedImage(BANNER_FACE_W, BANNER_FACE_H, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = canvas.createGraphics();
+        try {
+            org.bukkit.Color bc = baseColor.getColor();
+            g.setColor(new java.awt.Color(bc.getRed(), bc.getGreen(), bc.getBlue()));
+            g.fillRect(0, 0, BANNER_FACE_W, BANNER_FACE_H);
+
+            for (Pattern pattern : patterns) {
+                String textureName = pattern.getPattern().getKey().getKey();
+                BufferedImage mask = loadBannerPatternMask(textureName);
+                if (mask == null) {
+                    continue;
+                }
+                BufferedImage colorized = colorizeMask(mask, pattern.getColor());
+                g.setComposite(AlphaComposite.SrcOver);
+                g.drawImage(colorized, 0, 0, null);
+            }
+        } finally {
+            g.dispose();
+        }
+        return canvas;
+    }
+
+    private BufferedImage loadBannerPatternMask(String patternName) {
+        File cacheFile = new File(iconCacheDir, "banner_pattern_" + patternName + ".png");
+        if (cacheFile.exists()) {
+            try {
+                return ImageIO.read(cacheFile);
+            } catch (Exception e) {
+                cacheFile.delete();
+            }
+        }
+
+        BufferedImage full = downloadTexture("entity/banner/" + patternName + ".png");
+        if (full == null) {
+            return null;
+        }
+
+        if (full.getWidth() < BANNER_FACE_X + BANNER_FACE_W
+                || full.getHeight() < BANNER_FACE_Y + BANNER_FACE_H) {
+            return null;
+        }
+        BufferedImage face = full.getSubimage(BANNER_FACE_X, BANNER_FACE_Y, BANNER_FACE_W, BANNER_FACE_H);
+
+        try {
+            ImageIO.write(face, "png", cacheFile);
+        } catch (Exception e) {
+            // non-fatal
+        }
+        return face;
+    }
+
+    private static BufferedImage colorizeMask(BufferedImage mask, DyeColor dyeColor) {
+        int w = mask.getWidth();
+        int h = mask.getHeight();
+        BufferedImage result = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        org.bukkit.Color dc = dyeColor.getColor();
+        int cr = dc.getRed();
+        int cg = dc.getGreen();
+        int cb = dc.getBlue();
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int pixel = mask.getRGB(x, y);
+                int alpha = (pixel >> 24) & 0xFF;
+                if (alpha == 0) {
+                    continue;
+                }
+                int mr = (pixel >> 16) & 0xFF;
+                int mg = (pixel >> 8) & 0xFF;
+                int mb = pixel & 0xFF;
+                int nr = (mr * cr) / 255;
+                int ng = (mg * cg) / 255;
+                int nb = (mb * cb) / 255;
+                result.setRGB(x, y, (alpha << 24) | (nr << 16) | (ng << 8) | nb);
+            }
+        }
+        return result;
+    }
+
+    // ── Marker refresh ──────────────────────────────────────────────────
+
     /**
      * Refresh all markers on all worlds.
      */
@@ -393,8 +544,19 @@ public class Pl3xmapManager extends Base {
                     String markerKey = "basemanager_" + loc.id() + "_" + worldName;
                     int iconSize = getIconSize();
                     Icon marker = Icon.of(markerKey, coords[0], coords[2], iconKey);
-                    marker.setSize(Vector.of(iconSize, iconSize));
-                    marker.setAnchor(Vector.of(iconSize / 2.0, iconSize / 2.0));
+
+                    boolean locIsBanner = loc.iconItem() != null && isBanner(loc.iconItem().getType());
+                    int markerW;
+                    int markerH;
+                    if (locIsBanner) {
+                        markerW = getBannerIconWidth();
+                        markerH = markerW * 2;
+                    } else {
+                        markerW = iconSize;
+                        markerH = iconSize;
+                    }
+                    marker.setSize(Vector.of(markerW, markerH));
+                    marker.setAnchor(Vector.of(markerW / 2.0, markerH / 2.0));
 
                     String ownerName = getPlayerName(loc.owner());
                     String coordsStr = coords[0] + " " + coords[1] + " " + coords[2];
@@ -458,6 +620,10 @@ public class Pl3xmapManager extends Base {
 
     private int getIconSize() {
         return getPlugin().getConfig().getInt("pl3xmap.icon-size", 24);
+    }
+
+    private int getBannerIconWidth() {
+        return getPlugin().getConfig().getInt("pl3xmap.banner-icon-width", 24);
     }
 
     private String getTooltipTemplate() {
