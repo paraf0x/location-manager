@@ -3,6 +3,7 @@ package ua.favn.baseManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import ua.favn.baseManager.base.gui.GuiListener;
 import ua.favn.baseManager.commands.BaseCommand;
+import ua.favn.baseManager.compass.GlowManager;
 import ua.favn.baseManager.compass.TrackingCompassListener;
 import ua.favn.baseManager.compass.TrackingCompassManager;
 import ua.favn.baseManager.config.MessageManager;
@@ -23,6 +24,7 @@ public class BaseManager extends JavaPlugin {
     private LodestoneManager lodestoneManager;
     private TrackingCompassManager compassManager;
     private TrackingCompassListener compassListener;
+    private GlowManager glowManager;
     private MessageManager messageManager;
     private GuiManager guiManager;
 
@@ -42,6 +44,7 @@ public class BaseManager extends JavaPlugin {
         this.lodestoneManager.initialize();
 
         this.compassManager = new TrackingCompassManager(this);
+        this.glowManager = new GlowManager(this);
         this.messageManager = new MessageManager(this);
         this.guiManager = new GuiManager(this);
 
@@ -59,6 +62,9 @@ public class BaseManager extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (this.glowManager != null) {
+            this.glowManager.cleanup();
+        }
         this.getLogger().info("BaseManager disabled!");
     }
 
@@ -90,6 +96,10 @@ public class BaseManager extends JavaPlugin {
 
     public TrackingCompassListener getCompassListener() {
         return this.compassListener;
+    }
+
+    public GlowManager getGlowManager() {
+        return this.glowManager;
     }
 
     public GuiManager getGuiManager() {

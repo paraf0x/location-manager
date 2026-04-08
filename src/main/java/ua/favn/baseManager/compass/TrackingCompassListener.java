@@ -23,6 +23,7 @@ import org.bukkit.scheduler.BukkitTask;
 import ua.favn.baseManager.BaseManager;
 import ua.favn.baseManager.base.Base;
 import ua.favn.baseManager.base.util.FormatUtil;
+import ua.favn.baseManager.location.SavedLocation;
 
 /**
  * Handles tracking compass interactions: disposal, distance display, and auto-dispose.
@@ -262,7 +263,17 @@ public class TrackingCompassListener extends Base implements Listener {
             if (target == null) {
                 Component message = getPlugin().getMessageManager().get("compass.actionbar-no-base-here");
                 player.sendActionBar(message);
+                getPlugin().getGlowManager().removeGlow(player);
                 return;
+            }
+
+            // Update per-player glow on item frames at target lodestone
+            Integer locationId = manager.getLocationId(held);
+            if (locationId != null) {
+                SavedLocation loc = getPlugin().getLocationManager().get(locationId);
+                if (loc != null) {
+                    getPlugin().getGlowManager().updateGlow(player, loc);
+                }
             }
 
             int distance = (int) player.getLocation().distance(target);
@@ -284,5 +295,6 @@ public class TrackingCompassListener extends Base implements Listener {
         if (task != null) {
             task.cancel();
         }
+        getPlugin().getGlowManager().removeGlow(player);
     }
 }

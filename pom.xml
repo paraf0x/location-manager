@@ -18,6 +18,7 @@
         <!-- Dependency versions -->
         <paper.version>1.21-R0.1-SNAPSHOT</paper.version>
         <commodore.version>2.2</commodore.version>
+        <protocollib.version>5.4.0</protocollib.version>
 
         <!-- Test dependency versions -->
         <junit.version>5.11.0</junit.version>
@@ -64,6 +65,14 @@
             <artifactId>commodore</artifactId>
             <version>${commodore.version}</version>
             <scope>compile</scope>
+        </dependency>
+
+        <!-- ProtocolLib (per-player packets) -->
+        <dependency>
+            <groupId>net.dmulloy2</groupId>
+            <artifactId>ProtocolLib</artifactId>
+            <version>${protocollib.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Testing Dependencies -->
