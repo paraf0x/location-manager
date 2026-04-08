@@ -48,6 +48,10 @@
             <id>minecraft-repo</id>
             <url>https://libraries.minecraft.net/</url>
         </repository>
+        <repository>
+            <id>codemc</id>
+            <url>https://repo.codemc.io/repository/maven-public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -64,6 +68,14 @@
             <groupId>me.lucko</groupId>
             <artifactId>commodore</artifactId>
             <version>${commodore.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- AnvilGUI (search input) -->
+        <dependency>
+            <groupId>net.wesjd</groupId>
+            <artifactId>anvilgui</artifactId>
+            <version>1.10.11-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
 
@@ -144,12 +156,17 @@
                             <artifactSet>
                                 <includes>
                                     <include>me.lucko:commodore</include>
+                                    <include>net.wesjd:anvilgui</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
                                 <relocation>
                                     <pattern>me.lucko.commodore</pattern>
                                     <shadedPattern>ua.favn.baseManager.commodore</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>net.wesjd.anvilgui</pattern>
+                                    <shadedPattern>ua.favn.baseManager.lib.anvilgui</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

@@ -7,6 +7,7 @@ import ua.favn.baseManager.compass.GlowManager;
 import ua.favn.baseManager.compass.TrackingCompassListener;
 import ua.favn.baseManager.compass.TrackingCompassManager;
 import ua.favn.baseManager.config.MessageManager;
+import ua.favn.baseManager.gui.AnvilSearchHandler;
 import ua.favn.baseManager.gui.GuiManager;
 import ua.favn.baseManager.location.LocationManager;
 import ua.favn.baseManager.lodestone.LodestoneListener;
@@ -27,6 +28,7 @@ public class BaseManager extends JavaPlugin {
     private GlowManager glowManager;
     private MessageManager messageManager;
     private GuiManager guiManager;
+    private AnvilSearchHandler anvilSearchHandler;
 
     @Override
     public void onEnable() {
@@ -50,6 +52,7 @@ public class BaseManager extends JavaPlugin {
 
         // Register event listeners
         this.compassListener = new TrackingCompassListener(this);
+        this.anvilSearchHandler = new AnvilSearchHandler(this);
         this.getServer().getPluginManager().registerEvents(new GuiListener(this), this);
         this.getServer().getPluginManager().registerEvents(this.compassListener, this);
         this.getServer().getPluginManager().registerEvents(new LodestoneListener(this), this);
@@ -104,5 +107,9 @@ public class BaseManager extends JavaPlugin {
 
     public GuiManager getGuiManager() {
         return this.guiManager;
+    }
+
+    public AnvilSearchHandler getAnvilSearchHandler() {
+        return this.anvilSearchHandler;
     }
 }

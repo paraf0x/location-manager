@@ -49,9 +49,12 @@ public class MembersListGui extends PagedGuiInventory<UUID> {
     @Override
     public void compile() {
         // Background and outline
-        this.setBackground(createSimpleItem(Material.GRAY_STAINED_GLASS_PANE, Component.empty()));
-        this.setOutline(createSimpleItem(Material.BLACK_STAINED_GLASS_PANE, Component.empty()),
-            OutlineType.BOTTOM);
+        ItemStack bg = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        bg.editMeta(meta -> meta.setHideTooltip(true));
+        this.setBackground(bg);
+        ItemStack ol = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ol.editMeta(meta -> meta.setHideTooltip(true));
+        this.setOutline(ol, OutlineType.BOTTOM);
 
         // Page navigation
         int navY = getHeight();

@@ -21,6 +21,7 @@ import ua.favn.baseManager.location.SavedLocation;
 public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
     private final Player player;
     private final Filter filter;
+    private final String searchQuery;
 
     public enum Filter {
         ALL,
@@ -28,16 +29,33 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
     }
 
     public LocationBrowserGui(BaseManager plugin, Player player, Filter filter) {
-        super(plugin, buildLocationList(plugin, player, filter));
-        this.player = player;
-        this.filter = filter;
+        this(plugin, player, filter, null);
     }
 
-    private static List<SavedLocation> buildLocationList(BaseManager plugin, Player player, Filter filter) {
-        return switch (filter) {
+    public LocationBrowserGui(BaseManager plugin, Player player, Filter filter, String searchQuery) {
+        super(plugin, buildLocationList(plugin, player, filter, searchQuery));
+        this.player = player;
+        this.filter = filter;
+        this.searchQuery = searchQuery;
+    }
+
+    private static List<SavedLocation> buildLocationList(BaseManager plugin, Player player,
+                                                         Filter filter, String searchQuery) {
+        List<SavedLocation> list = switch (filter) {
             case ALL -> plugin.getLocationManager().getAll();
             case OWN -> plugin.getLocationManager().getByOwner(player.getUniqueId());
         };
+        if (searchQuery != null && !searchQuery.isBlank()) {
+            String q = searchQuery.toLowerCase();
+            var memberManager = plugin.getLocationManager().getMemberManager();
+            list = list.stream()
+                .filter(loc -> loc.tag().toLowerCase().contains(q)
+                    || loc.name().toLowerCase().contains(q)
+                    || memberManager.getMembers(loc.id()).values().stream()
+                        .anyMatch(name -> name.toLowerCase().contains(q)))
+                .toList();
+        }
+        return list;
     }
 
     @Override
@@ -50,6 +68,28 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
         int filterY = getHeight();
         createFilterButton(Filter.ALL, Material.COMPASS, 3, filterY);
         createFilterButton(Filter.OWN, Material.ENDER_PEARL, 4, filterY);
+
+        // Search button
+        Component searchName = searchQuery != null
+            ? Component.text("Search: " + searchQuery, Colors.GOLD)
+            : Component.text("Search", Colors.GOLD);
+        this.registerTempButton(new GuiButton(
+            createSimpleItem(Material.NAME_TAG, searchName,
+                Component.text("Click to search locations", Colors.SILVER)),
+            clicker -> getPlugin().getAnvilSearchHandler().openSearch(player, this.filter),
+            this.getSlot(6, getHeight())
+        ));
+
+        // Clear search button (only when search is active)
+        if (searchQuery != null) {
+            this.registerTempButton(new GuiButton(
+                createSimpleItem(Material.BARRIER,
+                    Component.text("Clear Search", Colors.RED),
+                    Component.text("Click to show all locations", Colors.SILVER)),
+                clicker -> getPlugin().getGuiManager().openLocationBrowser(player, this.filter),
+                this.getSlot(7, getHeight())
+            ));
+        }
 
         // Page navigation
         if (this.getPage() > 0) {
@@ -106,9 +146,11 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
 
         // Empty state
         if (this.subjects.isEmpty()) {
+            Component hint = searchQuery != null
+                ? Component.text("No results for '" + searchQuery + "'", Colors.SILVER)
+                : Component.text("Place a sign on a lodestone and wax it!", Colors.SILVER);
             ItemStack empty = createSimpleItem(Material.BARRIER,
-                Component.text("No locations found", Colors.RED),
-                Component.text("Place a sign on a lodestone and wax it!", Colors.SILVER));
+                Component.text("No locations found", Colors.RED), hint);
             this.setItem(5, 3, empty);
         }
     }
@@ -182,11 +224,15 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
     }
 
     private ItemStack createBackground() {
-        return createSimpleItem(Material.GRAY_STAINED_GLASS_PANE, Component.empty());
+        ItemStack item = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        item.editMeta(meta -> meta.setHideTooltip(true));
+        return item;
     }
 
     private ItemStack createOutline() {
-        return createSimpleItem(Material.BLACK_STAINED_GLASS_PANE, Component.empty());
+        ItemStack item = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        item.editMeta(meta -> meta.setHideTooltip(true));
+        return item;
     }
 
     private ItemStack createSimpleItem(Material material, Component name, Component... lore) {
@@ -203,7 +249,10 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
     @Override
     public Component getTitle() {
         String filterName = filter.name().charAt(0) + filter.name().substring(1).toLowerCase();
-        return Component.text("Locations - " + filterName, Colors.GOLD);
+        String title = searchQuery != null
+            ? "Locations - " + filterName + " - \"" + searchQuery + "\""
+            : "Locations - " + filterName;
+        return Component.text(title, Colors.GOLD);
     }
 
     @Override

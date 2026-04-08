@@ -29,6 +29,13 @@ public class GuiManager extends Base {
     }
 
     /**
+     * Opens the location browser with a filter and search query.
+     */
+    public void openLocationBrowser(Player player, LocationBrowserGui.Filter filter, String searchQuery) {
+        new LocationBrowserGui(getPlugin(), player, filter, searchQuery).open(player);
+    }
+
+    /**
      * Opens the location details GUI.
      */
     public void openLocationDetails(Player player, SavedLocation location) {

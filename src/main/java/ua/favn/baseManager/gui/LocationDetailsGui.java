@@ -47,7 +47,8 @@ public class LocationDetailsGui extends GuiInventory {
     @Override
     public void compile() {
         // Background
-        ItemStack bg = createSimpleItem(Material.GRAY_STAINED_GLASS_PANE, Component.empty());
+        ItemStack bg = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        bg.editMeta(meta -> meta.setHideTooltip(true));
         this.setBackground(bg);
 
         // Location info (center)
