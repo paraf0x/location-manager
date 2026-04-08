@@ -36,10 +36,8 @@ flowchart TD
     Start([Player at Lodestone]) --> PlaceSign[Place sign on lodestone]
     PlaceSign --> SetTag["Line 1: Tag (e.g. team name)"]
     SetTag --> SetName["Lines 2-4: Location name"]
-    SetName --> OptFrame{Item frame\non lodestone?}
-    OptFrame -->|Yes| AddItem["Place item in frame\n(banner, head, etc.)"]
-    OptFrame -->|No| Wax
-    AddItem --> Wax
+    SetName --> AddFrame["Place item frame on lodestone\nwith a banner, head, or any item\n(recommended for easy identification)"]
+    AddFrame --> Wax
 
     Wax["Wax sign with honeycomb"] --> CheckDup{Same tag:name\nexists?}
     CheckDup -->|No| Create[New location created]
@@ -71,6 +69,28 @@ flowchart TD
     style Removed fill:#c44,stroke:#333,color:#fff
     style Block fill:#c44,stroke:#333,color:#fff
 ```
+
+## Editing a Location
+
+To change the name or icon of an existing location, destroy and re-create it:
+
+```mermaid
+flowchart TD
+    Edit([Want to edit\nname or icon?]) --> Break["Break the sign\n(location is deleted)"]
+    Break --> NewSign["Place new sign on\nthe same lodestone"]
+    NewSign --> NewTag["Line 1: Same or new tag"]
+    NewTag --> NewName["Lines 2-4: New name"]
+    NewName --> NewIcon{Change icon?}
+    NewIcon -->|Yes| SwapItem["Swap item in frame\nor place new frame"]
+    NewIcon -->|No| KeepFrame["Keep existing frame as-is"]
+    SwapItem --> ReWax
+    KeepFrame --> ReWax
+    ReWax["Wax sign with honeycomb"] --> Done((Location\nRe-registered))
+
+    style Done fill:#4a9,stroke:#333,color:#fff
+```
+
+Since signs are waxed (locked) after registration, editing requires breaking the sign to delete the location, then re-registering with updated details. The lodestone and item frame can stay in place - only the sign needs to be replaced.
 
 ## Cross-Dimension Compass
 
