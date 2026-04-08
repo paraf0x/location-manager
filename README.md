@@ -20,14 +20,23 @@ Players create locations by placing a sign on a lodestone and waxing it with hon
 
 - Paper or Purpur 1.21+
 - Java 21
-- [ProtocolLib](https://github.com/dmulloy2/ProtocolLib) (optional - enables per-player item frame glowing)
+
+### Optional Dependencies
+
+| Plugin | Version | Purpose |
+|--------|---------|---------|
+| [Pl3xMap](https://modrinth.com/plugin/pl3xmap) | 1.21.11-544+ | Web map markers with per-location icons (block textures, player heads, **custom banners**) |
+| [ProtocolLib](https://github.com/dmulloy2/ProtocolLib) | 5.4.0+ | Per-player item frame glowing when holding a compass |
+
+Both are soft-dependencies - the plugin works without them but enables extra features when present.
 
 ## Installation
 
 1. Download `basemanager-x.x.x.jar` from [Releases](https://github.com/paraf0x/location-manager/releases)
 2. Place in your server's `plugins/` folder
-3. (Optional) Install ProtocolLib for item frame glowing
-4. Restart the server
+3. (Optional) Install Pl3xMap for web map markers
+4. (Optional) Install ProtocolLib for item frame glowing
+5. Restart the server
 
 ## Location Lifecycle
 
@@ -116,6 +125,53 @@ The location icon (displayed in the GUI) is taken from the **item frame on the l
 - The **last waxed** lodestone's item frame wins
 - If no item frame is present during waxing, the existing icon is kept
 
+## Pl3xMap Integration
+
+When [Pl3xMap](https://modrinth.com/plugin/pl3xmap) is installed, locations appear as markers on the web map. The plugin automatically downloads and renders the correct icon for each location.
+
+### Setup
+
+1. Install Pl3xMap on your server
+2. BaseManager detects it automatically on startup (check for `Pl3xMap found - map markers enabled.` in the console)
+3. Configure in `config.yml` under `pl3xmap:`
+
+```yaml
+pl3xmap:
+  enabled: true
+  layer-label: "Bases"        # Label in the Pl3xMap layer control
+  public-only: true           # Only show public locations
+  icon-size: 24               # Icon size for square icons (blocks, heads)
+  banner-icon-width: 24       # Banner width in pixels (height = 2x width)
+  tooltip: |                  # HTML tooltip template
+    <div style="text-align:center;">
+      <b style="font-size:13px;color:#f5a623;">{name}</b>
+      <br><span style="color:#aaa;font-size:11px;">{tag}</span>
+      <br><span style="font-size:11px;">{coords}</span>
+      <br><span style="color:#8bc34a;font-size:11px;">{owner}</span>
+    </div>
+```
+
+### Supported Icon Types on the Map
+
+The map marker icon is determined by the location's icon item (set via item frame on lodestone or `/loc icon` command):
+
+| Icon Type | How it's set | Rendering | Map Size |
+|-----------|-------------|-----------|----------|
+| **Block/Item texture** | `/loc icon <tag> <name> <material>` or item frame with any block/item | Texture downloaded from Minecraft asset CDN | `icon-size` x `icon-size` (square) |
+| **Player head** | Item frame with a player head | Skin face cropped from Mojang API (8x8 region, scaled to 16x16) | `icon-size` x `icon-size` (square) |
+| **Custom banner** | Item frame with a decorated banner | All pattern layers (up to 6) rendered via Java2D: base color fill + per-layer texture colorization and alpha compositing | `banner-icon-width` x `banner-icon-width * 2` (1:2 ratio) |
+| **Default** | No icon set, or icon type not recognized | Built-in `icon.png` from plugin resources | `icon-size` x `icon-size` (square) |
+
+Banner rendering supports all 42 Minecraft 1.21 pattern types and all 16 dye colors. Pattern textures and rendered banners are cached in `plugins/BaseManager/icons/`.
+
+### How Banner Rendering Works
+
+1. Base color extracted from the banner material (e.g. `MAGENTA_BANNER` → magenta fill)
+2. For each pattern layer, the 64x64 entity texture is downloaded and the front face is cropped (20x40 pixels)
+3. Each mask is colorized by multiplying pixel RGB with the layer's dye color
+4. Layers are composited onto the canvas using alpha blending
+5. The final image is registered with Pl3xMap's icon registry
+
 ## Sign Format
 
 ```
@@ -179,7 +235,27 @@ database:
 lodestone:
   enabled: true
   allowed-tags: []                # Empty = any tag allowed
+
+# Pl3xMap web map integration
+pl3xmap:
+  enabled: true                   # Enable/disable map markers
+  layer-label: "Bases"            # Layer name in Pl3xMap controls
+  public-only: true               # Only show public locations
+  icon-size: 24                   # Square icon size (blocks, heads)
+  banner-icon-width: 24           # Banner width (height = 2x)
 ```
+
+## Dependencies
+
+| Dependency | Version | Scope | Purpose |
+|------------|---------|-------|---------|
+| [Paper API](https://papermc.io/) | 1.21-R0.1 | provided | Minecraft server API |
+| [Pl3xMap](https://modrinth.com/plugin/pl3xmap) | 1.21.11-544 | provided (optional) | Web map marker API |
+| [ProtocolLib](https://github.com/dmulloy2/ProtocolLib) | 5.4.0 | provided (optional) | Packet-level entity manipulation |
+| [Commodore](https://github.com/lucko/commodore) | 2.2 | shaded | Brigadier command completions |
+| [AnvilGUI](https://github.com/WesJD/AnvilGUI) | 1.10.11 | shaded | Anvil-based search input |
+
+Test-only: JUnit 5 (5.11.0), MockBukkit (4.14.0), Mockito (5.14.0).
 
 ## Building
 
