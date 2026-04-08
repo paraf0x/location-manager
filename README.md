@@ -36,16 +36,17 @@ flowchart TD
     Start([Player places a Lodestone]) --> PlaceSign[Place sign on lodestone]
     PlaceSign --> SetTag["Line 1: Tag (e.g. team name)"]
     SetTag --> SetName["Lines 2-4: Location name"]
-    SetName --> AddFrame["Place item frame on lodestone\nwith a banner, head, or any item\n(recommended for easy identification)"]
-    AddFrame --> Wax
+    SetName --> Decorate["Add item frame icon on lodestone\nand/or build structure above\nwith player heads as members"]
+    Decorate --> Wax
 
     Wax["Wax sign with honeycomb"] --> CheckDup{Same tag:name\nexists?}
     CheckDup -->|No| Create[New location created]
     CheckDup -->|Yes, other dimension| Link["Coords added to\nexisting location"]
     CheckDup -->|Yes, same dimension| Block[Blocked - duplicate]
 
-    Create --> Registered((Location\nRegistered))
-    Link --> Registered
+    Create --> ScanHeads["Structure scanned\nPlayer heads → members"]
+    Link --> ScanHeads
+    ScanHeads --> Registered((Location\nRegistered))
 
     Registered --> Use
     Registered --> Edit
@@ -59,14 +60,10 @@ flowchart TD
         Compass --> Glow
     end
 
-    subgraph Edit ["Editing (name or icon)"]
-        BreakSignEdit["Break the sign"] --> NewSign["Place new sign\nwith updated name"]
-        NewSign --> SwapIcon{Change icon?}
-        SwapIcon -->|Yes| SwapItem["Swap item in frame"]
-        SwapIcon -->|No| KeepFrame["Keep existing frame"]
-        SwapItem --> ReWax["Wax sign"]
-        KeepFrame --> ReWax
-        ReWax --> Registered2((Re-registered))
+    subgraph Edit ["Editing (name, icon, or members)"]
+        BreakSignEdit["Break the sign"] --> Modify["Update sign, icon,\nor head structure"]
+        Modify --> ReWax["Wax sign"]
+        ReWax --> ScanHeads
     end
 
     subgraph Delete [Deletion]
@@ -76,7 +73,6 @@ flowchart TD
     end
 
     style Registered fill:#4a9,stroke:#333,color:#fff
-    style Registered2 fill:#4a9,stroke:#333,color:#fff
     style Removed fill:#c44,stroke:#333,color:#fff
     style Block fill:#c44,stroke:#333,color:#fff
 ```
