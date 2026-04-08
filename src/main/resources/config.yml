@@ -32,3 +32,5 @@ lodestone:
   enabled: true
   # Allowed tags (empty list = allow any tag)
   allowed-tags: []
+  # Maximum blocks to scan for player-head structure above lodestone (0 = disabled)
+  structure-scan-max-blocks: 128

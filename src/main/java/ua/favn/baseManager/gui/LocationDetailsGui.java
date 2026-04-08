@@ -68,7 +68,7 @@ public class LocationDetailsGui extends GuiInventory {
                     new FormatUtil.Format("{tag}", location.tag()),
                     new FormatUtil.Format("{name}", location.name()));
             },
-            this.getSlot(4, 3)
+            this.getSlot(5, 6)
         ));
 
         // Members section (row 4)

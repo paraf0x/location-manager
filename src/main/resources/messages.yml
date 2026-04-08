@@ -43,6 +43,7 @@ lodestone:
   no-name: "&cPlease write a location name on the sign!"
   duplicate-dimension: "&cLocation &b[{tag}] &e{name}&c already exists in &7{world}&c!"
   destroyed: "&cLocation &e{name}&c has been removed."
+  members-detected: "&aDetected &e{count}&a member(s) from structure: &b{members}"
 
 # Error messages
 errors:

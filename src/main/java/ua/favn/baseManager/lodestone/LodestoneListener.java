@@ -26,9 +26,12 @@ import ua.favn.baseManager.base.Base;
 import ua.favn.baseManager.base.util.BlockLocation;
 import ua.favn.baseManager.base.util.FormatUtil;
 import ua.favn.baseManager.base.util.ItemStackSerializer;
+import ua.favn.baseManager.location.MemberManager;
 import ua.favn.baseManager.location.SavedLocation;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -208,6 +211,8 @@ public class LodestoneListener extends Base implements Listener {
                 new FormatUtil.Format("{tag}", tag),
                 new FormatUtil.Format("{name}", name),
                 new FormatUtil.Format("{world}", worldName));
+
+            scanAndAddMembers(lodestone, existing.id(), player);
         } else {
             // Check max locations limit
             int maxLocations = getPlugin().getConfig().getInt("limits.max-locations-per-player", 0);
@@ -241,6 +246,8 @@ public class LodestoneListener extends Base implements Listener {
             getPlugin().getMessageManager().send(player, "lodestone.registered",
                 new FormatUtil.Format("{name}", name),
                 new FormatUtil.Format("{tag}", tag));
+
+            scanAndAddMembers(lodestone, structure.locationId(), player);
         }
 
         // Let vanilla waxing proceed (sign becomes uneditable)
@@ -317,6 +324,33 @@ public class LodestoneListener extends Base implements Listener {
                 getPlugin().getLogger().info("Lodestone structure destroyed by explosion: " + locationName);
             }
         }
+    }
+
+    /**
+     * Scans the structure above a lodestone for player heads and adds detected owners as members.
+     */
+    private void scanAndAddMembers(Block lodestone, int locationId, Player player) {
+        int maxScanBlocks = getPlugin().getConfig().getInt("lodestone.structure-scan-max-blocks", 128);
+        if (maxScanBlocks <= 0) {
+            return;
+        }
+
+        Map<UUID, String> detectedMembers = StructureScanner.scanForPlayerHeads(lodestone, maxScanBlocks);
+        detectedMembers.remove(player.getUniqueId());
+
+        if (detectedMembers.isEmpty()) {
+            return;
+        }
+
+        MemberManager memberManager = getPlugin().getLocationManager().getMemberManager();
+        for (Map.Entry<UUID, String> entry : detectedMembers.entrySet()) {
+            memberManager.addMember(locationId, entry.getKey(), entry.getValue());
+        }
+
+        String memberNames = String.join(", ", detectedMembers.values());
+        getPlugin().getMessageManager().send(player, "lodestone.members-detected",
+            new FormatUtil.Format("{count}", detectedMembers.size()),
+            new FormatUtil.Format("{members}", memberNames));
     }
 
     // --- Helpers ---
