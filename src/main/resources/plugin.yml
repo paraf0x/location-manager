@@ -11,6 +11,7 @@ commands:
     description: Main command for location management
     usage: /<command> [subcommand]
     aliases: [base, b, location]
+    permission: basemanager.use
 
 permissions:
   basemanager.use:
