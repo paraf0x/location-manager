@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Exclude test classes -->
+    <Match>
+        <Class name="~.*Test"/>
+    </Match>
+
+    <!-- Exclude Bukkit listener methods that intentionally catch and handle exceptions -->
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Method name="~on.*"/>
+    </Match>
+
+    <!-- Allow mutable fields in command/GUI handlers where state is managed -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Or>
+            <Class name="~.*Command"/>
+            <Class name="~.*Gui"/>
+            <Class name="~.*Manager"/>
+        </Or>
+    </Match>
+
+    <!-- Allow returning mutable collections from getters in domain objects -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Or>
+            <Class name="~ua\.favn\.baseManager\.location\..*"/>
+        </Or>
+    </Match>
+</FindBugsFilter>

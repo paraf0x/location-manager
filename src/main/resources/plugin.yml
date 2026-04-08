@@ -1,0 +1,23 @@
+name: BaseManager
+version: '${project.version}'
+main: ua.favn.baseManager.BaseManager
+api-version: '1.21'
+description: Location and waypoint management plugin for Minecraft
+author: favn
+
+commands:
+  loc:
+    description: Main command for location management
+    usage: /<command> [subcommand]
+    aliases: [base, b, location]
+
+permissions:
+  basemanager.use:
+    description: Allows using location GUI
+    default: true
+  basemanager.admin:
+    description: Allows using location management commands (save, delete, icon, etc.)
+    default: op
+  basemanager.reload:
+    description: Allows reloading plugin configuration
+    default: op

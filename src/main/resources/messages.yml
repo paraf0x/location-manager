@@ -1,0 +1,50 @@
+# BaseManager Messages
+# Use & for color codes, {variable} for placeholders
+
+# Prefix for all messages
+prefix: "&8[&6BaseManager&8] &r"
+
+# Command messages
+commands:
+  location-saved: "&aLocation &b[{tag}] &e{name}&a saved at &7{location}&a!"
+  location-coords-updated: "&aCoords for &b[{tag}] &e{name}&a updated in &7{world}&a!"
+  location-deleted: "&cLocation &b[{tag}] &e{name}&c has been deleted."
+  compass-given: "&aYou received a compass pointing to &b[{tag}] &e{name}&a!"
+  icon-changed: "&aIcon for &e{name}&a changed to &b{icon}&a!"
+
+# Compass messages
+compass:
+  item-name: "&6Tracking Compass: &e{location_name}"
+  item-lore:
+    - "&7Target: &f{location}"
+    - "&7World: &f{world}"
+    - ""
+    - "&eRight-click for distance info"
+    - "&eSneak + Right-click to dispose"
+    - "&eDrop to dispose"
+
+  distance-info: "&7Distance to &e{location_name}&7: &f{distance} &7blocks"
+  no-base-here: "&cNo base with this name in current dimension!"
+  invalid-target: "&cThis compass target is invalid!"
+  disposed: "&7Compass disposed."
+  arrived: "&aYou have arrived at &e{location_name}&a!"
+
+  actionbar-distance: "&e{location_name} &7- &f{distance} blocks"
+  actionbar-no-base-here: "&cNo base here"
+
+# Lodestone registration messages
+lodestone:
+  wax-to-confirm: "&eWax the sign with honeycomb to register &b[{tag}] &e{name}&e!"
+  registered: "&aLocation &e{name}&a registered with tag &b[{tag}]&a!"
+  already-registered: "&cThis lodestone already has a registered location!"
+  no-lodestone: "&cSign must be placed on or adjacent to a lodestone!"
+  no-name: "&cPlease write a location name on the sign!"
+  duplicate-dimension: "&cLocation &b[{tag}] &e{name}&c already exists in &7{world}&c!"
+  destroyed: "&cLocation &e{name}&c has been removed."
+
+# Error messages
+errors:
+  no-permission: "&cYou don't have permission to do that!"
+  location-not-found: "&cLocation not found: &e{name}"
+  invalid-name-length: "&cLocation name must be between {min} and {max} characters!"
+  max-locations-reached: "&cYou have reached the maximum number of locations ({max})!"

@@ -1,0 +1,34 @@
+# BaseManager Configuration
+# Location and waypoint management plugin
+
+# Compass settings
+compass:
+  # Automatically remove compass when player arrives at location
+  auto-dispose-on-arrival: true
+  # Radius in blocks to trigger arrival
+  arrival-radius: 10
+  # Show distance in action bar when holding compass
+  show-distance-actionbar: true
+  # How often to update action bar (in ticks, 20 = 1 second)
+  actionbar-update-ticks: 20
+
+# Location limits
+limits:
+  # Maximum locations per player (0 = unlimited)
+  max-locations-per-player: 50
+  # Minimum name length
+  min-name-length: 2
+  # Maximum name length
+  max-name-length: 32
+
+# Database settings
+database:
+  # Database file name (SQLite)
+  file: storage.db
+
+# Lodestone registration settings
+lodestone:
+  # Enable/disable lodestone + sign registration
+  enabled: true
+  # Allowed tags (empty list = allow any tag)
+  allowed-tags: []
