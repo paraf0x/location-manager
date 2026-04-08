@@ -34,7 +34,7 @@ Players create locations by placing a sign on a lodestone and waxing it with hon
 ```mermaid
 flowchart TD
     Start([Player at Lodestone]) --> PlaceSign[Place sign on lodestone]
-    PlaceSign --> SetTag["Line 1: Tag (e.g. BASE, COOL)"]
+    PlaceSign --> SetTag["Line 1: Tag (e.g. team name)"]
     SetTag --> SetName["Lines 2-4: Location name"]
     SetName --> OptFrame{Item frame\non lodestone?}
     OptFrame -->|Yes| AddItem["Place item in frame\n(banner, head, etc.)"]
@@ -72,18 +72,36 @@ flowchart TD
     style Block fill:#c44,stroke:#333,color:#fff
 ```
 
+## Cross-Dimension Compass
+
+When a location has coordinates in both Overworld and Nether, the tracking compass automatically switches between them:
+
+- **In Overworld**: Compass points to the Overworld coordinates, action bar shows distance
+- **Enter Nether portal**: Compass needle updates to point to the Nether coordinates
+- **Return to Overworld**: Compass switches back to Overworld coordinates
+- **No coords in current dimension**: Compass spins freely, action bar shows "No base here"
+
+Auto-dispose only triggers in the **origin dimension** (where you got the compass). Walking past a Nether portal won't accidentally consume your compass.
+
+```mermaid
+flowchart LR
+    OW["Overworld\nCompass points to OW coords"] -->|Enter Nether| NE["Nether\nCompass points to Nether coords"]
+    NE -->|Return to Overworld| OW
+    NE -->|No Nether coords| Spin["Compass spins\n'No base here'"]
+```
+
 ## Sign Format
 
 ```
 +------------------+
-| [COOL]           |  <- Line 1: Tag (with or without brackets, empty = "BASE")
-| My Awesome       |  <- Line 2: Name part 1
-| Base             |  <- Line 3: Name part 2 (optional)
+| [WOLVES]         |  <- Line 1: Tag (with or without brackets, empty = "BASE")
+| Main Base        |  <- Line 2: Name part 1
+| North            |  <- Line 3: Name part 2 (optional)
 |                  |  <- Line 4: Name part 3 (optional)
 +------------------+
 ```
 
-Result: Tag = `COOL`, Name = `My Awesome Base`
+Result: Tag = `WOLVES`, Name = `Main Base North`
 
 - Lines 2-4 are joined with spaces, empty lines ignored
 - Tag is case-insensitive, stored uppercase
