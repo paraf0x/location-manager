@@ -5,7 +5,9 @@ import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Particle;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,6 +22,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 import ua.favn.baseManager.BaseManager;
 import ua.favn.baseManager.base.Base;
 import ua.favn.baseManager.base.util.FormatUtil;
@@ -277,6 +280,11 @@ public class TrackingCompassListener extends Base implements Listener {
             }
 
             int distance = (int) player.getLocation().distance(target);
+
+            if (manager.isParticleTrailEnabled()) {
+                spawnParticleTrail(player, target, distance);
+            }
+
             Component message = getPlugin().getMessageManager().get("compass.actionbar-distance",
                 new FormatUtil.Format("{distance}", distance),
                 new FormatUtil.Format("{location_name}", displayName));
@@ -285,6 +293,33 @@ public class TrackingCompassListener extends Base implements Listener {
         }, 0L, interval);
 
         actionBarTasks.put(player.getUniqueId(), task);
+    }
+
+    /**
+     * Spawn a particle trail from the player toward the target location.
+     * Color interpolates from green (close) to red (far).
+     * Uses player.spawnParticle so only the compass holder sees the particles.
+     */
+    private void spawnParticleTrail(Player player, Location target, int distance) {
+        TrackingCompassManager manager = getPlugin().getCompassManager();
+        double spacing = manager.getParticleTrailSpacing();
+        int maxDist = Math.min(manager.getParticleTrailDistance(), distance);
+        int density = manager.getParticleTrailDensity();
+
+        Location start = player.getEyeLocation();
+        Vector direction = target.toVector().subtract(start.toVector()).normalize();
+
+        // Color: green when close (<50), red when far (>500), interpolated between
+        float ratio = Math.min(1.0f, Math.max(0.0f, (distance - 50f) / 450f));
+        int red = (int) (ratio * 255);
+        int green = (int) ((1.0f - ratio) * 255);
+        Particle.DustOptions dust = new Particle.DustOptions(
+            Color.fromRGB(red, green, 0), 1.0f);
+
+        for (double d = spacing; d <= maxDist; d += spacing) {
+            Location point = start.clone().add(direction.clone().multiply(d));
+            player.spawnParticle(Particle.DUST, point, density, 0, 0, 0, 0, dust);
+        }
     }
 
     /**

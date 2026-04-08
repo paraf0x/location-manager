@@ -11,6 +11,14 @@ compass:
   show-distance-actionbar: true
   # How often to update action bar (in ticks, 20 = 1 second)
   actionbar-update-ticks: 20
+  # Show particle trail pointing toward target location
+  particle-trail: true
+  # Maximum distance to render particle trail (blocks)
+  particle-trail-distance: 30
+  # Spacing between particles (blocks)
+  particle-trail-spacing: 2.0
+  # Number of particles at each point
+  particle-trail-density: 1
 
 # Location limits
 limits:

@@ -291,4 +291,20 @@ public class TrackingCompassManager extends Base {
     public int getActionBarUpdateTicks() {
         return getPlugin().getConfig().getInt("compass.actionbar-update-ticks", 20);
     }
+
+    public boolean isParticleTrailEnabled() {
+        return getPlugin().getConfig().getBoolean("compass.particle-trail", false);
+    }
+
+    public int getParticleTrailDistance() {
+        return getPlugin().getConfig().getInt("compass.particle-trail-distance", 30);
+    }
+
+    public double getParticleTrailSpacing() {
+        return getPlugin().getConfig().getDouble("compass.particle-trail-spacing", 2.0);
+    }
+
+    public int getParticleTrailDensity() {
+        return getPlugin().getConfig().getInt("compass.particle-trail-density", 1);
+    }
 }
