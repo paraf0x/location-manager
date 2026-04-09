@@ -11,12 +11,8 @@ commands:
     description: Main command for location management
     usage: /<command> [subcommand]
     aliases: [base, b, location]
-    permission: basemanager.use
 
 permissions:
-  basemanager.use:
-    description: Allows using location GUI
-    default: true
   basemanager.admin:
     description: Allows using location management commands (save, delete, icon, etc.)
     default: op

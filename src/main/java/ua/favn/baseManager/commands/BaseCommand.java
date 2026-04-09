@@ -1,14 +1,8 @@
 package ua.favn.baseManager.commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.tree.LiteralCommandNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import me.lucko.commodore.Commodore;
-import me.lucko.commodore.CommodoreProvider;
 import java.time.Duration;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
@@ -41,7 +35,6 @@ public class BaseCommand extends TabCompleteCommand {
 
     public BaseCommand(BaseManager plugin) {
         super(plugin);
-        registerCompletions(CommodoreProvider.getCommodore(this.getPlugin()), this.getCommand());
     }
 
     @Override
@@ -355,7 +348,7 @@ public class BaseCommand extends TabCompleteCommand {
         }
 
         if (args.length == 1) {
-            List<String> subcommands = new ArrayList<>(List.of("gui", "menu", "share"));
+            List<String> subcommands = new ArrayList<>(List.of("share"));
             if (player.hasPermission(ADMIN_PERMISSION)) {
                 subcommands.addAll(List.of("save", "delete", "list", "compass", "icon", "member"));
             }
@@ -462,40 +455,4 @@ public class BaseCommand extends TabCompleteCommand {
         return "loc";
     }
 
-    private static void registerCompletions(Commodore commodore, Command command) {
-        LiteralCommandNode<?> baseCommand = LiteralArgumentBuilder.literal("loc")
-            .then(LiteralArgumentBuilder.literal("save")
-                .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
-                    .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string()))))
-            .then(LiteralArgumentBuilder.literal("delete")
-                .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
-                    .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string()))))
-            .then(LiteralArgumentBuilder.literal("list"))
-            .then(LiteralArgumentBuilder.literal("compass")
-                .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
-                    .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string()))))
-            .then(LiteralArgumentBuilder.literal("icon")
-                .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
-                    .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
-                        .then(RequiredArgumentBuilder.argument("material", StringArgumentType.string())))))
-            .then(LiteralArgumentBuilder.literal("member")
-                .then(LiteralArgumentBuilder.literal("add")
-                    .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
-                        .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
-                            .then(RequiredArgumentBuilder.argument("player", StringArgumentType.string())))))
-                .then(LiteralArgumentBuilder.literal("remove")
-                    .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
-                        .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
-                            .then(RequiredArgumentBuilder.argument("player", StringArgumentType.string()))))))
-            .then(LiteralArgumentBuilder.literal("share")
-                .then(RequiredArgumentBuilder.argument("tag", StringArgumentType.string())
-                    .then(RequiredArgumentBuilder.argument("name", StringArgumentType.string())
-                        .then(RequiredArgumentBuilder.argument("player", StringArgumentType.string())))))
-            .then(LiteralArgumentBuilder.literal("gui"))
-            .then(LiteralArgumentBuilder.literal("menu"))
-            .build();
-
-        commodore.register(command, baseCommand);
-        Bukkit.getLogger().info("[BaseManager] Registered command completions");
-    }
 }
