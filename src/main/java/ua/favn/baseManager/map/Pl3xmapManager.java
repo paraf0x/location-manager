@@ -16,11 +16,14 @@ import net.pl3x.map.core.Pl3xMap;
 import net.pl3x.map.core.image.IconImage;
 import net.pl3x.map.core.markers.layer.SimpleLayer;
 import net.pl3x.map.core.markers.Vector;
+import net.pl3x.map.core.markers.Point;
 import net.pl3x.map.core.markers.marker.Icon;
+import net.pl3x.map.core.markers.marker.Rectangle;
 import net.pl3x.map.core.markers.option.Options;
 import net.pl3x.map.core.markers.option.Tooltip;
 import net.pl3x.map.core.world.World;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.DyeColor;
 import org.bukkit.Material;
 import org.bukkit.block.banner.Pattern;
@@ -38,6 +41,7 @@ import ua.favn.baseManager.location.SavedLocation;
  */
 public class Pl3xmapManager extends Base {
     private static final String LAYER_KEY = "basemanager";
+    private static final String RECT_LAYER_KEY = "basemanager_areas";
     private static final String DEFAULT_ICON_KEY = "basemanager_default";
     private static final String TEXTURE_CDN = "https://assets.mcasset.cloud/1.21.1/assets/minecraft/textures/";
 
@@ -528,11 +532,19 @@ public class Pl3xmapManager extends Base {
                 ? getPlugin().getLocationManager().getPublicLocations()
                 : getPlugin().getLocationManager().getAll();
 
+            boolean rectsEnabled = isRectanglesEnabled();
+
             for (World world : Pl3xMap.api().getWorldRegistry()) {
                 String worldName = world.getName();
 
                 SimpleLayer layer = getOrCreateLayer(world);
                 layer.clearMarkers();
+
+                SimpleLayer rectLayer = null;
+                if (rectsEnabled) {
+                    rectLayer = getOrCreateRectangleLayer(world);
+                    rectLayer.clearMarkers();
+                }
 
                 for (SavedLocation loc : locations) {
                     int[] coords = loc.getCoords(worldName);
@@ -570,6 +582,33 @@ public class Pl3xmapManager extends Base {
                         .setDirection(Tooltip.Direction.TOP);
                     marker.setOptions(new Options().setTooltip(tooltip));
                     layer.addMarker(marker);
+
+                    // Add rectangle overlay if configured for this tag
+                    if (rectLayer != null) {
+                        ConfigurationSection tagSection = getRectangleTagSection(loc.tag());
+                        if (tagSection != null) {
+                            int size = tagSection.getInt("size", 200);
+                            int half = size / 2;
+                            Point p1 = Point.of(coords[0] - half, coords[2] - half);
+                            Point p2 = Point.of(coords[0] + half, coords[2] + half);
+
+                            String rectKey = "basemanager_rect_" + loc.id() + "_" + worldName;
+                            Rectangle rect = Rectangle.of(rectKey, p1, p2);
+
+                            Options rectOptions = Options.builder()
+                                .stroke(true)
+                                .strokeWeight(tagSection.getInt("stroke-weight", 2))
+                                .strokeColor(tagSection.getInt("stroke-color", 0x800088FF))
+                                .fill(true)
+                                .fillColor(tagSection.getInt("fill-color", 0x330088FF))
+                                .tooltipContent(tooltipHtml)
+                                .tooltipDirection(Tooltip.Direction.TOP)
+                                .build();
+
+                            rect.setOptions(rectOptions);
+                            rectLayer.addMarker(rect);
+                        }
+                    }
                 }
             }
         } catch (Exception e) {
@@ -591,6 +630,21 @@ public class Pl3xmapManager extends Base {
         return layer;
     }
 
+    private SimpleLayer getOrCreateRectangleLayer(World world) {
+        String label = getRectangleLayerLabel();
+        if (world.getLayerRegistry().has(RECT_LAYER_KEY)) {
+            return (SimpleLayer) world.getLayerRegistry().get(RECT_LAYER_KEY);
+        }
+        SimpleLayer layer = new SimpleLayer(RECT_LAYER_KEY, () -> label);
+        layer.setShowControls(true);
+        layer.setDefaultHidden(isRectangleDefaultHidden());
+        layer.setUpdateInterval(30);
+        layer.setLiveUpdate(true);
+        layer.setPriority(0);
+        world.getLayerRegistry().register(RECT_LAYER_KEY, layer);
+        return layer;
+    }
+
     public void cleanup() {
         if (!pl3xmapAvailable) {
             return;
@@ -599,6 +653,9 @@ public class Pl3xmapManager extends Base {
             for (World world : Pl3xMap.api().getWorldRegistry()) {
                 if (world.getLayerRegistry().has(LAYER_KEY)) {
                     world.getLayerRegistry().unregister(LAYER_KEY);
+                }
+                if (world.getLayerRegistry().has(RECT_LAYER_KEY)) {
+                    world.getLayerRegistry().unregister(RECT_LAYER_KEY);
                 }
             }
         } catch (Exception ignored) {
@@ -636,8 +693,25 @@ public class Pl3xmapManager extends Base {
             + "</div>");
     }
 
+    private boolean isRectanglesEnabled() {
+        return getPlugin().getConfig().getBoolean("pl3xmap.rectangles.enabled", false);
+    }
+
+    private String getRectangleLayerLabel() {
+        return getPlugin().getConfig().getString("pl3xmap.rectangles.layer-label", "Location Borders");
+    }
+
+    private boolean isRectangleDefaultHidden() {
+        return getPlugin().getConfig().getBoolean("pl3xmap.rectangles.default-hidden", true);
+    }
+
+    private ConfigurationSection getRectangleTagSection(String tag) {
+        return getPlugin().getConfig().getConfigurationSection("pl3xmap.rectangles.tags." + tag);
+    }
+
     private String getPlayerName(java.util.UUID uuid) {
         org.bukkit.OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
         return op.getName() != null ? op.getName() : uuid.toString().substring(0, 8);
     }
+
 }

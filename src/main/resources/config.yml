@@ -64,3 +64,24 @@ pl3xmap:
       <br><span style="font-size:11px;">{coords}</span>
       <br><span style="color:#8bc34a;font-size:11px;">{owner}</span>
     </div>
+  # Rectangle area overlays around locations (per-tag)
+  # Only tags listed below will get rectangles drawn around them
+  rectangles:
+    enabled: true
+    # Layer label shown in Pl3xMap control panel
+    layer-label: "Location Borders"
+    # Hidden by default - users toggle it on in the layer controls
+    default-hidden: true
+    # Per-tag rectangle settings (tag names must match exactly, case-sensitive)
+    # Colors are ARGB hex integers: 0xAARRGGBB
+    tags:
+      BASE:
+        size: 200
+        stroke-color: 0x800088FF
+        stroke-weight: 2
+        fill-color: 0x330088FF
+      FARM:
+        size: 100
+        stroke-color: 0x8000AA00
+        stroke-weight: 2
+        fill-color: 0x3300AA00
