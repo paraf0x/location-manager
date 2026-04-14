@@ -69,6 +69,7 @@ public class BaseCommand extends TabCompleteCommand {
             case "icon" -> handleIcon(player, args);
             case "member" -> handleMember(player, args);
             case "share" -> handleShare(player, args);
+            case "detail" -> handleDetail(player, args);
             case "reload" -> handleReload(player);
             default -> {
                 player.sendMessage(Component.text("Unknown subcommand. Use /loc for GUI.", Colors.RED));
@@ -330,6 +331,26 @@ public class BaseCommand extends TabCompleteCommand {
             new FormatUtil.Format("{name}", name));
     }
 
+    private void handleDetail(Player player, String[] args) {
+        if (Predicate.check(args.length < 2, player, "Usage: /loc detail <id>")) {
+            return;
+        }
+
+        try {
+            int id = Integer.parseInt(args[1]);
+            SavedLocation loc = getPlugin().getLocationManager().get(id);
+
+            if (loc == null) {
+                player.sendMessage(Component.text("Location not found.", Colors.RED));
+                return;
+            }
+
+            getPlugin().getGuiManager().openLocationDetails(player, loc);
+        } catch (NumberFormatException e) {
+            player.sendMessage(Component.text("Invalid location ID.", Colors.RED));
+        }
+    }
+
     private void handleReload(Player player) {
         if (!player.hasPermission("basemanager.reload")) {
             player.sendMessage(Component.text("You don't have permission to reload the config!", Colors.RED));
@@ -350,7 +371,7 @@ public class BaseCommand extends TabCompleteCommand {
         if (args.length == 1) {
             List<String> subcommands = new ArrayList<>(List.of("share"));
             if (player.hasPermission(ADMIN_PERMISSION)) {
-                subcommands.addAll(List.of("save", "delete", "list", "compass", "icon", "member"));
+                subcommands.addAll(List.of("save", "delete", "list", "compass", "icon", "member", "detail"));
             }
             if (player.hasPermission("basemanager.reload")) {
                 subcommands.add("reload");
@@ -421,6 +442,14 @@ public class BaseCommand extends TabCompleteCommand {
                     .toList();
             }
             return List.of();
+        }
+
+        // detail subcommand: arg[1] = location ID
+        if (sub.equals("detail") && args.length == 2) {
+            return getPlugin().getLocationManager().getAll().stream()
+                .map(l -> String.valueOf(l.id()))
+                .filter(id -> id.startsWith(args[1]))
+                .toList();
         }
 
         // arg[1] = tag
