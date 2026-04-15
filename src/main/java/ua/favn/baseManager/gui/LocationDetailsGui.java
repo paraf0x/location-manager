@@ -148,7 +148,6 @@ public class LocationDetailsGui extends GuiInventory {
                 Component.text("Return to location browser", Colors.SILVER)),
             clicker -> {
                 if (backCommand != null) {
-                    player.closeInventory();
                     player.performCommand(backCommand);
                 } else {
                     getPlugin().getGuiManager().openLocationBrowser(player);
