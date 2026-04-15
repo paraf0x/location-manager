@@ -332,7 +332,7 @@ public class BaseCommand extends TabCompleteCommand {
     }
 
     private void handleDetail(Player player, String[] args) {
-        if (Predicate.check(args.length < 2, player, "Usage: /loc detail <id>")) {
+        if (Predicate.check(args.length < 2, player, "Usage: /loc detail <id> [--back <command>]")) {
             return;
         }
 
@@ -345,7 +345,16 @@ public class BaseCommand extends TabCompleteCommand {
                 return;
             }
 
-            getPlugin().getGuiManager().openLocationDetails(player, loc);
+            // Parse optional --back <command> flag
+            String backCommand = null;
+            for (int i = 2; i < args.length - 1; i++) {
+                if (args[i].equalsIgnoreCase("--back")) {
+                    backCommand = args[i + 1];
+                    break;
+                }
+            }
+
+            getPlugin().getGuiManager().openLocationDetails(player, loc, backCommand);
         } catch (NumberFormatException e) {
             player.sendMessage(Component.text("Invalid location ID.", Colors.RED));
         }

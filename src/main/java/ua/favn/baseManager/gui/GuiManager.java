@@ -43,6 +43,14 @@ public class GuiManager extends Base {
     }
 
     /**
+     * Opens the location details GUI with a custom back command.
+     * When backCommand is non-null, the back button runs that command instead of opening the browser.
+     */
+    public void openLocationDetails(Player player, SavedLocation location, String backCommand) {
+        LocationDetailsGui.openAsync(getPlugin(), player, location, backCommand);
+    }
+
+    /**
      * Opens the members list GUI for a location.
      */
     public void openMembersList(Player player, SavedLocation location) {

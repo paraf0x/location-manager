@@ -27,19 +27,32 @@ import ua.favn.baseManager.location.SavedLocation;
 public class LocationDetailsGui extends GuiInventory {
     private final Player player;
     private final SavedLocation location;
+    private final String backCommand;
     private Map<UUID, String> memberNames = new LinkedHashMap<>();
 
     public LocationDetailsGui(BaseManager plugin, Player player, SavedLocation location) {
+        this(plugin, player, location, null);
+    }
+
+    public LocationDetailsGui(BaseManager plugin, Player player, SavedLocation location, String backCommand) {
         super(plugin);
         this.player = player;
         this.location = location;
+        this.backCommand = backCommand;
     }
 
     /**
      * Opens the details GUI with member names loaded from database.
      */
     public static void openAsync(BaseManager plugin, Player player, SavedLocation location) {
-        LocationDetailsGui gui = new LocationDetailsGui(plugin, player, location);
+        openAsync(plugin, player, location, null);
+    }
+
+    /**
+     * Opens the details GUI with member names loaded from database, using a custom back command.
+     */
+    public static void openAsync(BaseManager plugin, Player player, SavedLocation location, String backCommand) {
+        LocationDetailsGui gui = new LocationDetailsGui(plugin, player, location, backCommand);
         gui.memberNames = plugin.getLocationManager().getMemberManager().getMembers(location.id());
         gui.open(player);
     }
@@ -133,7 +146,14 @@ public class LocationDetailsGui extends GuiInventory {
             createSimpleItem(Material.ARROW,
                 Component.text("Back", Colors.WHITE),
                 Component.text("Return to location browser", Colors.SILVER)),
-            clicker -> getPlugin().getGuiManager().openLocationBrowser(player),
+            clicker -> {
+                if (backCommand != null) {
+                    player.closeInventory();
+                    player.performCommand(backCommand);
+                } else {
+                    getPlugin().getGuiManager().openLocationBrowser(player);
+                }
+            },
             this.getSlot(1, 6)
         ));
     }
