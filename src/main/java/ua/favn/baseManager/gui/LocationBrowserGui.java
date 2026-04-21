@@ -195,7 +195,7 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
         }
 
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(FormatUtil.normalize(Component.text(loc.displayName(), Colors.GOLD)));
+        meta.displayName(FormatUtil.normalize(Component.text(loc.name(), Colors.GOLD)));
 
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("Tag: ", Colors.WHITE).append(Component.text(loc.tag(), Colors.LIGHT_GREEN)));
@@ -207,8 +207,8 @@ public class LocationBrowserGui extends PagedGuiInventory<SavedLocation> {
                 .append(Component.text(coords[0] + " " + coords[1] + " " + coords[2], Colors.SILVER)));
         }
 
-        String ownerName = getPlayerName(loc.owner());
-        lore.add(Component.text("Owner: ", Colors.WHITE).append(Component.text(ownerName, Colors.SILVER)));
+        String creatorName = getPlayerName(loc.owner());
+        lore.add(Component.text("Creator: ", Colors.WHITE).append(Component.text(creatorName, Colors.SILVER)));
         lore.add(Component.empty());
         lore.add(Component.text("Click for compass", Colors.GOLD));
         lore.add(Component.text("Shift+Click for details", Colors.GOLD));

@@ -193,13 +193,13 @@ public class LocationDetailsGui extends GuiInventory {
                 .append(Component.text(location.coordsString(world), Colors.SILVER)));
         }
 
-        lore.add(Component.text("Owner: ", Colors.WHITE)
+        lore.add(Component.text("Creator: ", Colors.WHITE)
             .append(Component.text(getPlayerName(location.owner()), Colors.SILVER)));
         lore.add(Component.text("Created: ", Colors.WHITE)
             .append(Component.text(DateUtil.formatDate(location.created()), Colors.SILVER)));
 
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(FormatUtil.normalize(Component.text(location.displayName(), Colors.GOLD)));
+        meta.displayName(FormatUtil.normalize(Component.text(location.name(), Colors.GOLD)));
         meta.lore(lore.stream().map(FormatUtil::normalize).toList());
         item.setItemMeta(meta);
         return item;

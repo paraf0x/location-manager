@@ -570,13 +570,14 @@ public class Pl3xmapManager extends Base {
                     marker.setSize(Vector.of(markerW, markerH));
                     marker.setAnchor(Vector.of(markerW / 2.0, markerH / 2.0));
 
-                    String ownerName = getPlayerName(loc.owner());
+                    String creatorName = getPlayerName(loc.owner());
                     String coordsStr = coords[0] + " " + coords[1] + " " + coords[2];
                     String tooltipHtml = getTooltipTemplate()
                         .replace("{name}", loc.name())
                         .replace("{tag}", loc.tag())
                         .replace("{coords}", coordsStr)
-                        .replace("{owner}", ownerName);
+                        .replace("{creator}", creatorName)
+                        .replace("{owner}", creatorName);
 
                     Tooltip tooltip = new Tooltip(tooltipHtml)
                         .setDirection(Tooltip.Direction.TOP);
