@@ -102,6 +102,7 @@ public class BaseCommand extends TabCompleteCommand {
             existing.setCoords(currentWorld, player.getLocation().getBlockX(),
                 player.getLocation().getBlockY(), player.getLocation().getBlockZ());
             existing.saveCoords(currentWorld);
+            getPlugin().getLocationManager().refreshPl3xmap();
             getPlugin().getMessageManager().send(player, "commands.location-coords-updated",
                 new FormatUtil.Format("{tag}", tag),
                 new FormatUtil.Format("{name}", name),
@@ -212,6 +213,7 @@ public class BaseCommand extends TabCompleteCommand {
         }
 
         loc.save();
+        getPlugin().getLocationManager().refreshPl3xmap();
         getPlugin().getMessageManager().send(player, "commands.icon-changed",
             new FormatUtil.Format("{name}", loc.displayName()),
             new FormatUtil.Format("{icon}", iconLabel));

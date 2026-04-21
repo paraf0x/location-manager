@@ -207,6 +207,10 @@ public class LodestoneListener extends Base implements Listener {
             structure.save();
             manager.addToCache(structure);
 
+            // Refresh map markers so the new coords (and possibly new icon)
+            // propagate — saveCoords()/save() don't trigger this themselves.
+            getPlugin().getLocationManager().refreshPl3xmap();
+
             getPlugin().getMessageManager().send(player, "commands.location-coords-updated",
                 new FormatUtil.Format("{tag}", tag),
                 new FormatUtil.Format("{name}", name),
@@ -240,6 +244,9 @@ public class LodestoneListener extends Base implements Listener {
                 if (loc != null) {
                     loc.icon(iconData);
                     loc.save();
+                    // manager.create() already refreshed, but that was before
+                    // the icon was attached — refresh again so the icon shows.
+                    getPlugin().getLocationManager().refreshPl3xmap();
                 }
             }
 

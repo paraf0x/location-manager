@@ -162,6 +162,10 @@ public class LodestoneManager extends Base {
         // Make it public (all lodestone locations are public)
         location.isPublic(true);
         location.save();
+        // Re-emit markers: locationManager.create() already refreshed, but at
+        // that point isPublic was still false — a public-only map would have
+        // filtered it out. Refresh again so the now-public marker shows.
+        getPlugin().getLocationManager().refreshPl3xmap();
 
         // Create the structure
         BlockLocation lodestoneBlock = BlockLocation.fromLocation(lodestone);

@@ -282,6 +282,14 @@ public class LocationManager extends Base {
         if (ownerList != null) {
             ownerList.remove(loc);
         }
+        refreshPl3xmap();
+    }
+
+    /**
+     * Tell Pl3xmap to rebuild all markers. Safe to call from any mutation
+     * site; no-op if Pl3xmap isn't installed.
+     */
+    public void refreshPl3xmap() {
         if (getPlugin().getPl3xmapManager() != null) {
             getPlugin().getPl3xmapManager().refreshMarkers();
         }
@@ -296,9 +304,7 @@ public class LocationManager extends Base {
         SavedLocation loc = new SavedLocation(this, owner, tag, name, location);
         loc.save();
         addToCache(loc);
-        if (getPlugin().getPl3xmapManager() != null) {
-            getPlugin().getPl3xmapManager().refreshMarkers();
-        }
+        refreshPl3xmap();
         return loc;
     }
 
