@@ -3,7 +3,7 @@
 
 include .local.env
 
-.PHONY: build deploy deploy-clean clean test verify
+.PHONY: build deploy deploy-clean clean test verify e2e-setup e2e
 
 # Build the plugin
 build:
@@ -35,3 +35,11 @@ verify:
 # Clean build artifacts
 clean:
 	./mvnw clean
+
+# Install e2e test dependencies
+e2e-setup:
+	cd e2e && npm install
+
+# Run end-to-end tests (deploys first)
+e2e: deploy
+	cd e2e && npm test

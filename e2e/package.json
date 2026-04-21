@@ -1,0 +1,14 @@
+{
+  "name": "basemanager-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "mc-e2e": "github:paraf0x/mc-e2e-testserver",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0"
+  }
+}
