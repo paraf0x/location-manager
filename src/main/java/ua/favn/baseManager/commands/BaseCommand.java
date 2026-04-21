@@ -178,7 +178,7 @@ public class BaseCommand extends TabCompleteCommand {
     }
 
     private void handleIcon(Player player, String[] args) {
-        if (Predicate.check(args.length < 4, player, "Usage: /loc icon <tag> <name> <material>")) {
+        if (Predicate.check(args.length < 4, player, "Usage: /loc icon <tag> <name> <material|hand>")) {
             return;
         }
 
@@ -191,19 +191,30 @@ public class BaseCommand extends TabCompleteCommand {
             return;
         }
 
-        try {
-            Material mat = Material.valueOf(materialName);
-            // Serialize a simple ItemStack as icon
-            loc.icon(ItemStackSerializer.serialize(new ItemStack(mat)));
-        } catch (IllegalArgumentException e) {
-            player.sendMessage(Component.text("Invalid material: " + materialName, Colors.RED));
-            return;
+        String iconLabel;
+        if (materialName.equals("HAND")) {
+            ItemStack held = player.getInventory().getItemInMainHand();
+            if (Predicate.check(held == null || held.getType() == Material.AIR, player,
+                "Hold an item in your main hand first.")) {
+                return;
+            }
+            loc.icon(ItemStackSerializer.serialize(held));
+            iconLabel = held.getType().name();
+        } else {
+            try {
+                Material mat = Material.valueOf(materialName);
+                loc.icon(ItemStackSerializer.serialize(new ItemStack(mat)));
+                iconLabel = materialName;
+            } catch (IllegalArgumentException e) {
+                player.sendMessage(Component.text("Invalid material: " + materialName, Colors.RED));
+                return;
+            }
         }
 
         loc.save();
         getPlugin().getMessageManager().send(player, "commands.icon-changed",
             new FormatUtil.Format("{name}", loc.displayName()),
-            new FormatUtil.Format("{icon}", materialName));
+            new FormatUtil.Format("{icon}", iconLabel));
     }
 
     private void handleMember(Player player, String[] args) {
@@ -508,6 +519,13 @@ public class BaseCommand extends TabCompleteCommand {
                 .filter(l -> l.tag().equalsIgnoreCase(tag))
                 .map(SavedLocation::name)
                 .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
+                .toList();
+        }
+
+        // arg[3] = material|hand for icon subcommand
+        if (args.length == 4 && sub.equals("icon")) {
+            return List.of("hand").stream()
+                .filter(s -> s.startsWith(args[3].toLowerCase()))
                 .toList();
         }
 

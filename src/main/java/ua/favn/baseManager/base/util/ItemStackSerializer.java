@@ -19,32 +19,31 @@ import org.bukkit.inventory.meta.SkullMeta;
 
 public class ItemStackSerializer {
 
-    /**
-     * Serializes an ItemStack to a Base64-encoded YAML string.
-     */
     public static String serialize(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return null;
         }
-        YamlConfiguration yaml = new YamlConfiguration();
-        yaml.set("item", item);
-        return Base64.getEncoder().encodeToString(yaml.saveToString().getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(item.serializeAsBytes());
     }
 
-    /**
-     * Deserializes an ItemStack from a Base64-encoded YAML string.
-     */
     public static ItemStack deserialize(String data) {
         if (data == null || data.isEmpty()) {
             return null;
         }
         try {
-            String yamlStr = new String(Base64.getDecoder().decode(data), StandardCharsets.UTF_8);
-            YamlConfiguration yaml = new YamlConfiguration();
-            yaml.loadFromString(yamlStr);
-            return yaml.getItemStack("item");
+            byte[] bytes = Base64.getDecoder().decode(data);
+            return ItemStack.deserializeBytes(bytes);
         } catch (Exception e) {
-            return null;
+            // Legacy YAML format fallback for icons saved before the byte-based
+            // serializer: older entries are Base64-encoded YAML starting with "item:".
+            try {
+                String yamlStr = new String(Base64.getDecoder().decode(data), StandardCharsets.UTF_8);
+                YamlConfiguration yaml = new YamlConfiguration();
+                yaml.loadFromString(yamlStr);
+                return yaml.getItemStack("item");
+            } catch (Exception ignored) {
+                return null;
+            }
         }
     }
 
