@@ -38,7 +38,12 @@ compass:
 
 # Lodestone registration messages
 lodestone:
-  wax-to-confirm: "&eWax the sign with honeycomb to register &b[{tag}] &e{name}&e!"
+  wax-to-confirm: "&eWaypoint &b[{tag}] &e{name}&e — &asign ✓&e. &7Optional: attach an item frame with an item for a custom icon.&e Wax the sign with honeycomb to finish!"
+  progress:
+    ready: "&aWaypoint &b[{tag}] &e{name}&a — &asign ✓&a, &aicon ✓&a: &f{icon}&a. Wax the sign with honeycomb to register!"
+    sign-ok-frame-empty: "&eWaypoint &b[{tag}] &e{name}&e — &asign ✓&e, &eempty frame attached&e. &7Optional: put an item in the frame for a custom icon.&e Wax the sign with honeycomb to finish!"
+    icon-set-need-sign: "&eIcon registered from frame: &f{icon}&e. &cStill needed:&e sign on the lodestone with &b[TAG]&e + name, then wax it."
+    frame-empty-need-sign: "&eEmpty item frame attached. &7Optional: put an item in the frame for a custom icon.&e &cStill needed:&e sign with &b[TAG]&e + name on the lodestone, then wax it."
   registered: "&aLocation &e{name}&a registered with tag &b[{tag}]&a!"
   already-registered: "&cThis lodestone already has a registered location!"
   no-lodestone: "&cSign must be placed on or adjacent to a lodestone!"

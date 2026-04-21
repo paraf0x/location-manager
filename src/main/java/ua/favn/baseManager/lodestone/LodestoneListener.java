@@ -19,7 +19,9 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import io.papermc.paper.event.player.PlayerItemFrameChangeEvent;
 import org.bukkit.inventory.ItemStack;
 import ua.favn.baseManager.BaseManager;
 import ua.favn.baseManager.base.Base;
@@ -66,35 +68,137 @@ public class LodestoneListener extends Base implements Listener {
             return;
         }
 
-        // Check first line for tag
-        String firstLine = PlainTextComponentSerializer.plainText().serialize(event.line(0)).trim();
-        if (firstLine.isEmpty()) {
-            return; // No tag at all, not a location sign
-        }
-
-        String tag = extractTag(firstLine);
-        if (tag == null) {
-            // No [] brackets - use the text directly as tag
-            tag = firstLine.toUpperCase();
-        }
-
-        // Build name from lines 2-4
-        String name = buildName(event.line(1), event.line(2), event.line(3));
-        if (name.isEmpty()) {
-            return; // No name, not a location sign
-        }
-
-        // Find adjacent lodestone
-        Block signBlock = event.getBlock();
-        Block lodestone = findAdjacentLodestone(signBlock);
+        Block lodestone = findAdjacentLodestone(event.getBlock());
         if (lodestone == null) {
             return; // Not adjacent to lodestone, just a regular sign
         }
 
-        // Validation passed - inform player to wax
-        getPlugin().getMessageManager().send(event.getPlayer(), "lodestone.wax-to-confirm",
-            new FormatUtil.Format("{tag}", tag),
-            new FormatUtil.Format("{name}", name));
+        ParsedSign parsed = parseSignLines(event.line(0), event.line(1), event.line(2), event.line(3));
+        reportConstructionProgress(event.getPlayer(), lodestone, parsed, findItemFrameIcon(lodestone));
+    }
+
+    /**
+     * Item frame attached to a lodestone → nudge player toward next step.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onItemFramePlace(HangingPlaceEvent event) {
+        LodestoneManager manager = getPlugin().getLodestoneManager();
+        if (!manager.isEnabled()) {
+            return;
+        }
+        if (!(event.getEntity() instanceof ItemFrame)) {
+            return;
+        }
+        Block attached = event.getBlock();
+        if (attached == null || attached.getType() != Material.LODESTONE) {
+            return;
+        }
+        if (event.getPlayer() == null) {
+            return;
+        }
+        reportConstructionProgress(event.getPlayer(), attached,
+            findSignForLodestone(attached), null);
+    }
+
+    /**
+     * Item placed/removed in an item frame on a lodestone → nudge player.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onItemFrameChange(PlayerItemFrameChangeEvent event) {
+        LodestoneManager manager = getPlugin().getLodestoneManager();
+        if (!manager.isEnabled()) {
+            return;
+        }
+        ItemFrame frame = event.getItemFrame();
+        Block attached = frame.getLocation().getBlock()
+            .getRelative(frame.getAttachedFace());
+        if (attached.getType() != Material.LODESTONE) {
+            return;
+        }
+        ItemStack newItem = event.getItemStack();
+        if (newItem == null || newItem.getType() == Material.AIR) {
+            // Item removed — still report so player knows where they stand
+            reportConstructionProgress(event.getPlayer(), attached,
+                findSignForLodestone(attached), null);
+            return;
+        }
+        reportConstructionProgress(event.getPlayer(), attached,
+            findSignForLodestone(attached), newItem.clone());
+    }
+
+    /**
+     * Inspect the current state of a lodestone-based waypoint under
+     * construction and send the player a context-aware message telling them
+     * what's done, what's optional, and what's still needed. Does nothing if
+     * the lodestone is already a registered waypoint.
+     */
+    private void reportConstructionProgress(
+        Player player, Block lodestone, ParsedSign sign, ItemStack frameItem
+    ) {
+        LodestoneManager manager = getPlugin().getLodestoneManager();
+        if (manager.isRegisteredBlock(BlockLocation.fromLocation(lodestone.getLocation()))) {
+            return; // already a registered waypoint
+        }
+        boolean hasFrame = frameItem != null || hasFrameOnLodestone(lodestone);
+
+        if (sign != null && frameItem != null) {
+            getPlugin().getMessageManager().send(player, "lodestone.progress.ready",
+                new FormatUtil.Format("{tag}", sign.tag()),
+                new FormatUtil.Format("{name}", sign.name()),
+                new FormatUtil.Format("{icon}", formatIcon(frameItem)));
+        } else if (sign != null && hasFrame) {
+            getPlugin().getMessageManager().send(player, "lodestone.progress.sign-ok-frame-empty",
+                new FormatUtil.Format("{tag}", sign.tag()),
+                new FormatUtil.Format("{name}", sign.name()));
+        } else if (sign != null) {
+            getPlugin().getMessageManager().send(player, "lodestone.wax-to-confirm",
+                new FormatUtil.Format("{tag}", sign.tag()),
+                new FormatUtil.Format("{name}", sign.name()));
+        } else if (frameItem != null) {
+            getPlugin().getMessageManager().send(player, "lodestone.progress.icon-set-need-sign",
+                new FormatUtil.Format("{icon}", formatIcon(frameItem)));
+        } else if (hasFrame) {
+            getPlugin().getMessageManager().send(player, "lodestone.progress.frame-empty-need-sign");
+        }
+        // Neither sign nor frame → nothing relevant to report yet.
+    }
+
+    /**
+     * Format an icon ItemStack as human-readable text for chat. Uses the
+     * item's display name (e.g. HDB head's "Melon") when present, falling
+     * back to the material name. Example outputs:
+     *   "Melon (PLAYER_HEAD)"
+     *   "DIAMOND_BLOCK"
+     */
+    private String formatIcon(ItemStack item) {
+        if (item == null) {
+            return "";
+        }
+        String display = ItemStackSerializer.extractDisplayName(item);
+        String material = item.getType().name();
+        if (display != null && !display.isEmpty() && !display.equalsIgnoreCase(material)) {
+            return display + " (" + material + ")";
+        }
+        return material;
+    }
+
+    /**
+     * Returns true if any item frame is attached to the lodestone (empty or not).
+     */
+    private boolean hasFrameOnLodestone(Block lodestone) {
+        for (Entity entity : lodestone.getWorld().getNearbyEntities(
+                lodestone.getLocation().add(0.5, 0.5, 0.5), 1.5, 1.5, 1.5)) {
+            if (!(entity instanceof ItemFrame frame)) {
+                continue;
+            }
+            Block attached = frame.getLocation().getBlock().getRelative(frame.getAttachedFace());
+            if (attached.getLocation().getBlockX() == lodestone.getLocation().getBlockX()
+                && attached.getLocation().getBlockY() == lodestone.getLocation().getBlockY()
+                && attached.getLocation().getBlockZ() == lodestone.getLocation().getBlockZ()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -125,22 +229,12 @@ public class LodestoneListener extends Base implements Listener {
             return;
         }
 
-        // Read tag from line 1
-        String firstLine = PlainTextComponentSerializer.plainText().serialize(sign.line(0)).trim();
-        if (firstLine.isEmpty()) {
-            return; // No tag, not a location sign
+        ParsedSign parsed = parseSignLines(sign.line(0), sign.line(1), sign.line(2), sign.line(3));
+        if (parsed == null) {
+            return; // No tag/name found
         }
-
-        String tag = extractTag(firstLine);
-        if (tag == null) {
-            tag = firstLine.toUpperCase();
-        }
-
-        // Build name from lines 2-4
-        String name = buildName(sign.line(1), sign.line(2), sign.line(3));
-        if (name.isEmpty()) {
-            return; // No name
-        }
+        String tag = parsed.tag();
+        String name = parsed.name();
 
         // Find adjacent lodestone
         Block lodestone = findAdjacentLodestone(block);
@@ -375,21 +469,44 @@ public class LodestoneListener extends Base implements Listener {
     }
 
     /**
-     * Build a location name from sign lines 2-4, joining non-empty lines with spaces.
+     * Parse a lodestone sign. Blank lines anywhere are allowed: the first
+     * non-empty line is the tag, remaining non-empty lines (joined with
+     * spaces) are the name. Returns null if the sign has no tag or no name.
      */
-    private String buildName(Component... lines) {
-        StringBuilder sb = new StringBuilder();
-        for (Component line : lines) {
-            String text = PlainTextComponentSerializer.plainText().serialize(line).trim();
-            if (!text.isEmpty()) {
-                if (sb.length() > 0) {
-                    sb.append(" ");
-                }
-                sb.append(text);
+    private ParsedSign parseSignLines(Component... lines) {
+        String[] text = new String[lines.length];
+        int tagIdx = -1;
+        for (int i = 0; i < lines.length; i++) {
+            text[i] = PlainTextComponentSerializer.plainText().serialize(lines[i]).trim();
+            if (tagIdx == -1 && !text[i].isEmpty()) {
+                tagIdx = i;
             }
         }
-        return sb.toString();
+        if (tagIdx == -1) {
+            return null;
+        }
+        String tag = extractTag(text[tagIdx]);
+        if (tag == null) {
+            tag = text[tagIdx].toUpperCase();
+        }
+        StringBuilder nameSb = new StringBuilder();
+        for (int i = tagIdx + 1; i < text.length; i++) {
+            if (text[i].isEmpty()) {
+                continue;
+            }
+            if (nameSb.length() > 0) {
+                nameSb.append(' ');
+            }
+            nameSb.append(text[i]);
+        }
+        String name = nameSb.toString();
+        if (name.isEmpty()) {
+            return null;
+        }
+        return new ParsedSign(tag, name);
     }
+
+    private record ParsedSign(String tag, String name) {}
 
     /**
      * Find an item in an item frame attached to the lodestone block.
@@ -417,6 +534,27 @@ public class LodestoneListener extends Base implements Listener {
     /**
      * Find a lodestone adjacent to the sign block.
      */
+    /**
+     * Reverse of findAdjacentLodestone: given a lodestone, find an adjacent
+     * sign and parse it. Returns null if no valid sign is attached yet.
+     */
+    private ParsedSign findSignForLodestone(Block lodestone) {
+        for (BlockFace face : ADJACENT_FACES) {
+            Block neighbor = lodestone.getRelative(face);
+            if (!isSign(neighbor.getType())) {
+                continue;
+            }
+            if (!(neighbor.getState() instanceof Sign sign)) {
+                continue;
+            }
+            ParsedSign parsed = parseSignLines(sign.line(0), sign.line(1), sign.line(2), sign.line(3));
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return null;
+    }
+
     private Block findAdjacentLodestone(Block signBlock) {
         BlockData data = signBlock.getBlockData();
 
