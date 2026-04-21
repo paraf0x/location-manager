@@ -270,8 +270,9 @@ public class BaseCommand extends TabCompleteCommand {
         }
 
         String tag = args[1].toUpperCase();
-        String name = args[2];
-        String targetName = args[3];
+        String targetName = args[args.length - 1];
+        String name = String.join(" ",
+            java.util.Arrays.copyOfRange(args, 2, args.length - 1));
 
         SavedLocation loc = getPlugin().getLocationManager().getByTagAndName(tag, name);
         if (Predicate.check(loc == null, player, "Location not found: " + tag + ":" + name)) {
@@ -401,18 +402,48 @@ public class BaseCommand extends TabCompleteCommand {
                     .filter(t -> t.toLowerCase().startsWith(args[1].toLowerCase()))
                     .toList();
             }
-            if (args.length == 3) {
+            if (args.length >= 3) {
                 String tag = args[1].toUpperCase();
+                String currentToken = args[args.length - 1];
+                String priorName = args.length == 3 ? "" :
+                    String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length - 1));
+
+                // If priorName exactly matches a location name, we're at the player position.
+                if (!priorName.isEmpty()) {
+                    boolean priorIsExactMatch = getPlugin().getLocationManager().getAll().stream()
+                        .anyMatch(l -> l.tag().equalsIgnoreCase(tag)
+                            && l.name().equalsIgnoreCase(priorName));
+                    if (priorIsExactMatch) {
+                        return Bukkit.getOnlinePlayers().stream()
+                            .map(Player::getName)
+                            .filter(n -> n.toLowerCase().startsWith(currentToken.toLowerCase()))
+                            .toList();
+                    }
+                }
+
+                // Otherwise, still typing the name.
+                // For the first name token (args.length == 3), return full names (includes spaces).
+                if (args.length == 3) {
+                    return getPlugin().getLocationManager().getAll().stream()
+                        .filter(l -> l.tag().equalsIgnoreCase(tag))
+                        .map(SavedLocation::name)
+                        .filter(n -> n.toLowerCase().startsWith(currentToken.toLowerCase()))
+                        .toList();
+                }
+
+                // For subsequent tokens, return just the next word of each matching location.
+                String typedName = String.join(" ",
+                    java.util.Arrays.copyOfRange(args, 2, args.length));
+                int wordIdx = args.length - 3;
                 return getPlugin().getLocationManager().getAll().stream()
                     .filter(l -> l.tag().equalsIgnoreCase(tag))
-                    .map(SavedLocation::name)
-                    .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
-                    .toList();
-            }
-            if (args.length == 4) {
-                return Bukkit.getOnlinePlayers().stream()
-                    .map(Player::getName)
-                    .filter(n -> n.toLowerCase().startsWith(args[3].toLowerCase()))
+                    .filter(l -> l.name().toLowerCase().startsWith(typedName.toLowerCase()))
+                    .map(l -> {
+                        String[] words = l.name().split(" ");
+                        return wordIdx < words.length ? words[wordIdx] : null;
+                    })
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
                     .toList();
             }
             return List.of();
