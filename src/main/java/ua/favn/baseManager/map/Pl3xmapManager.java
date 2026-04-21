@@ -158,11 +158,16 @@ public class Pl3xmapManager extends Base {
             }
         }
 
-        // Download from CDN — try block path first, then item path
+        // Download from CDN. Try paths in order of specificity. Multi-face
+        // blocks (melon, enchanting_table, ancient_debris, end_portal_frame)
+        // don't expose block/<name>.png — only block/<name>_side.png or
+        // block/<name>_top.png. Item-only materials (sticks, enchanted_book)
+        // live under item/<name>.png.
         BufferedImage image = downloadTexture("block/" + name + ".png");
-        if (image == null) {
-            image = downloadTexture("item/" + name + ".png");
-        }
+        if (image == null) image = downloadTexture("block/" + name + "_side.png");
+        if (image == null) image = downloadTexture("block/" + name + "_top.png");
+        if (image == null) image = downloadTexture("block/" + name + "_front.png");
+        if (image == null) image = downloadTexture("item/" + name + ".png");
 
         if (image != null) {
             try {
@@ -299,8 +304,10 @@ public class Pl3xmapManager extends Base {
     }
 
     /**
-     * Get icon key for a head. Uses player name as fallback key lookup
-     * since skin URL hash may not be available on the main thread.
+     * Get icon key for a head. Derived from the texture URL so every unique
+     * skin (real player heads AND HDB heads — which all share profile.name
+     * "HeadDatabase") gets its own icon. Falls back to profile name only when
+     * no texture URL is resolvable on the main thread.
      */
     private String getHeadIconKey(ItemStack head) {
         if (!(head.getItemMeta() instanceof SkullMeta skullMeta)) {
@@ -311,7 +318,15 @@ public class Pl3xmapManager extends Base {
             return null;
         }
 
-        // Check by name-based key (set during async preload)
+        String urlKey = headKeyFromProfileTextureUrl(profile);
+        if (urlKey != null) {
+            String key = "basemanager_head_" + urlKey;
+            if (registeredIcons.contains(key)) {
+                return key;
+            }
+        }
+        // Legacy fallback: name-based key (real player heads already
+        // registered this way pre-fix).
         String name = profile.getName();
         if (name != null) {
             String nameKey = "basemanager_head_" + name.toLowerCase();
@@ -323,6 +338,30 @@ public class Pl3xmapManager extends Base {
     }
 
     /**
+     * Extract a stable per-texture cache key from the profile. The texture
+     * URL ends in a 64-char hex hash unique to each skin; take the first 16
+     * chars as a compact identifier. Returns null if no URL can be resolved
+     * on the main thread (typical for real player heads with only a name).
+     */
+    private String headKeyFromProfileTextureUrl(PlayerProfile profile) {
+        try {
+            URL url = profile.getTextures().getSkin();
+            if (url == null) {
+                return null;
+            }
+            String path = url.getPath();
+            int slash = path.lastIndexOf('/');
+            String hash = slash >= 0 ? path.substring(slash + 1) : path;
+            if (hash.isEmpty()) {
+                return null;
+            }
+            return hash.length() > 16 ? hash.substring(0, 16) : hash;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Download a player head skin, crop the face, and register with Pl3xmap.
      * Must be called from an async thread.
      */
@@ -331,23 +370,32 @@ public class Pl3xmapManager extends Base {
             return;
         }
         PlayerProfile profile = skullMeta.getOwnerProfile();
-        if (profile == null || profile.getName() == null) {
+        if (profile == null) {
             return;
         }
 
-        String name = profile.getName().toLowerCase();
-        String iconKey = "basemanager_head_" + name;
-        if (registeredIcons.contains(iconKey)) {
-            return;
-        }
-
+        // getSkinUrl may block on Mojang API — this method must be async.
         URL skinUrl = getSkinUrl(head);
         if (skinUrl == null) {
             return;
         }
 
+        // Use the skin URL's hash as the cache key so different HDB heads
+        // (which all share profile.name "HeadDatabase") produce different icons.
+        String urlPath = skinUrl.getPath();
+        int slash = urlPath.lastIndexOf('/');
+        String urlHash = slash >= 0 ? urlPath.substring(slash + 1) : urlPath;
+        if (urlHash.isEmpty()) {
+            return;
+        }
+        String keyName = (urlHash.length() > 16 ? urlHash.substring(0, 16) : urlHash);
+        String iconKey = "basemanager_head_" + keyName;
+        if (registeredIcons.contains(iconKey)) {
+            return;
+        }
+
         try {
-            File cacheFile = new File(iconCacheDir, "head_" + name + ".png");
+            File cacheFile = new File(iconCacheDir, "head_" + keyName + ".png");
             BufferedImage face;
 
             if (cacheFile.exists()) {
