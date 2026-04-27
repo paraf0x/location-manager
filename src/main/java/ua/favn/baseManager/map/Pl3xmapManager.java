@@ -269,7 +269,7 @@ public class Pl3xmapManager extends Base {
     /**
      * Decode a Base64 textures value and extract the skin URL.
      */
-    private URL extractUrlFromTextureValue(String base64Value) {
+    static URL extractUrlFromTextureValue(String base64Value) {
         try {
             String json = new String(Base64.getDecoder().decode(base64Value));
             int httpStart = json.indexOf("http://textures.minecraft.net");
@@ -289,22 +289,63 @@ public class Pl3xmapManager extends Base {
 
     /**
      * Resolve a skin URL from the current profile snapshot without any network
-     * calls. This is safe to use on the main thread.
+     * calls. This is safe to use on the main thread. Uses Paper's direct
+     * ProfileProperty API to avoid serialize() format ambiguity across
+     * Paper/Purpur builds.
      */
     private URL getSkinUrlFromProfile(PlayerProfile profile) {
+        URL fromProperties = getSkinUrlFromPaperProperties(profile);
+        if (fromProperties != null) {
+            return fromProperties;
+        }
+
         try {
             URL direct = profile.getTextures().getSkin();
             if (direct != null) {
                 return direct;
             }
         } catch (Exception ignored) {
-            // fall through to serialized properties
+            // fall through to serialized fallback
         }
+
         return getSkinUrlFromSerializedProperties(profile);
     }
 
     /**
-     * Resolve a skin URL from serialized profile properties.
+     * Read texture properties via Paper's direct ProfileProperty API. This is
+     * the primary extraction path — it works regardless of how the underlying
+     * server build serializes profiles to YAML maps.
+     */
+    private URL getSkinUrlFromPaperProperties(PlayerProfile profile) {
+        if (!(profile instanceof com.destroystokyo.paper.profile.PlayerProfile paperProfile)) {
+            return null;
+        }
+        try {
+            for (com.destroystokyo.paper.profile.ProfileProperty prop : paperProfile.getProperties()) {
+                if (!"textures".equals(prop.getName())) {
+                    continue;
+                }
+                String value = prop.getValue();
+                if (value == null || value.isBlank()) {
+                    continue;
+                }
+                URL resolved = extractUrlFromTextureValue(value);
+                if (resolved != null) {
+                    return resolved;
+                }
+            }
+        } catch (Exception e) {
+            getPlugin().getLogger().warning("Failed to read Paper profile properties: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Last-resort fallback: parse skin URL from {@code profile.serialize()}.
+     * Paper builds normally serialize properties as {@code List<Map<String,
+     * String>>}, but the format is implementation-defined and has varied
+     * across versions, so this path is only used after Paper's direct API
+     * has been tried.
      */
     private URL getSkinUrlFromSerializedProperties(PlayerProfile profile) {
         try {
@@ -454,6 +495,15 @@ public class Pl3xmapManager extends Base {
         // getSkinUrl may block on Mojang API — this method must be async.
         URL skinUrl = getSkinUrl(head);
         if (skinUrl == null) {
+            int propCount = 0;
+            if (profile instanceof com.destroystokyo.paper.profile.PlayerProfile pp) {
+                propCount = pp.getProperties().size();
+            }
+            getPlugin().getLogger().warning(
+                "Could not resolve skin URL for head icon "
+                + "(profile name='" + profile.getName()
+                + "', uniqueId=" + profile.getUniqueId()
+                + ", paper-properties=" + propCount + ")");
             return false;
         }
 
