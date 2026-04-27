@@ -1,9 +1,13 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import fs from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import type { McBot } from 'mc-e2e';
 import { acquireServer, releaseServer, getServer, getDb } from './helpers.js';
 
 const BOT_NAME = 'BmTest';
+const TEST_SERVER_DIR = process.env.TEST_SERVER_DIR ?? '/Users/maksymvasyukov/purpur-test';
+const BASEMANAGER_CONFIG_PATH = `${TEST_SERVER_DIR}/plugins/BaseManager/config.yml`;
+const PL3XMAP_MARKERS_PATH = `${TEST_SERVER_DIR}/plugins/Pl3xMap/web/tiles/world/markers/basemanager.json`;
 
 async function rcon(command: string): Promise<string> {
   const r = await getServer().rcon();
@@ -85,6 +89,32 @@ function extractTextFromJson(node: unknown): string {
 
 function stripFormat(s: string): string {
   return s.replace(/§./g, '');
+}
+
+function setPl3xmapPublicOnly(enabled: boolean): void {
+  const config = fs.readFileSync(BASEMANAGER_CONFIG_PATH, 'utf8');
+  const updated = config.replace(/(^\s*public-only:\s*)(true|false)\s*$/m, `$1${enabled}`);
+  if (updated === config) {
+    throw new Error(`Could not update public-only in ${BASEMANAGER_CONFIG_PATH}`);
+  }
+  fs.writeFileSync(BASEMANAGER_CONFIG_PATH, updated, 'utf8');
+}
+
+function readPl3xmapMarkers(): Array<{ data?: { image?: string }; options?: { tooltip?: { content?: string } } }> {
+  return JSON.parse(fs.readFileSync(PL3XMAP_MARKERS_PATH, 'utf8'));
+}
+
+async function waitForMarkerImage(locName: string, timeoutMs = 15000): Promise<string | null> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const markers = readPl3xmapMarkers();
+    const hit = markers.find(marker => (marker.options?.tooltip?.content ?? '').includes(`>${locName}<`));
+    if (hit) {
+      return hit.data?.image ?? null;
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return null;
 }
 
 describe('BaseManager E2E', () => {
@@ -283,6 +313,43 @@ describe('BaseManager E2E', () => {
 
     bot.chat('/loc delete BASE iconEmpty');
     await bot.nextMessage(/deleted|removed/i, 5_000).catch(() => {});
+  });
+
+  test('Issue 3 map payload: slim-metadata head resolves to basemanager_head icon', async () => {
+    const locName = 'hdbSlim' + (Date.now() % 1000000);
+    const slimTextureValue =
+      'ewogICJ0aW1lc3RhbXAiIDogMTc3NzI3MDc5MzQxNSwKICAicHJvZmlsZUlkIiA6ICI2NDBiMDc4YzcyOTE0MjA3OTk4M2Q4YjM4Y2NhZjU0OSIsCiAgInByb2ZpbGVOYW1lIiA6ICJQbG9pbmtTYXVyIiwKICAic2lnbmF0dXJlUmVxdWlyZWQiIDogdHJ1ZSwKICAidGV4dHVyZXMiIDogewogICAgIlNLSU4iIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlL2Q4YjQ2NjU4MTZmOWIyMDFlYzU4ZDM2ZmZmMGQyODE2ZTA4NjdjMzgyY2ViM2E4MDgxZTNjYmI0NTA4MTdiZTUiLAogICAgICAibWV0YWRhdGEiIDogewogICAgICAgICJtb2RlbCIgOiAic2xpbSIKICAgICAgfQogICAgfQogIH0KfQ==';
+
+    const originalConfig = fs.readFileSync(BASEMANAGER_CONFIG_PATH, 'utf8');
+    try {
+      setPl3xmapPublicOnly(false);
+      bot.chat('/loc reload');
+      await new Promise(r => setTimeout(r, 1500));
+
+      bot.chat(`/loc save TEST ${locName}`);
+      await bot.nextMessage(/saved|Location/i, 8_000);
+
+      await rcon(
+        `item replace entity ${BOT_NAME} weapon.mainhand with minecraft:player_head[minecraft:profile={name:"PloinkSaur",properties:[{name:"textures",value:"${slimTextureValue}"}]}]`,
+      );
+      await new Promise(r => setTimeout(r, 700));
+
+      bot.chat(`/loc icon TEST ${locName} hand`);
+      await bot.nextMessage(/Icon.*changed|changed to|icon/i, 8_000).catch(() => {});
+      await new Promise(r => setTimeout(r, 1000));
+
+      await rcon('pl3xmap fullrender world');
+      const image = await waitForMarkerImage(locName, 20000);
+      expect(image, `marker image for ${locName} should exist`).toBeTruthy();
+      expect(image, `marker image for ${locName} should be a head icon`).toMatch(/^basemanager_head_/);
+      expect(image).not.toBe('basemanager_default');
+    } finally {
+      fs.writeFileSync(BASEMANAGER_CONFIG_PATH, originalConfig, 'utf8');
+      bot.chat('/loc reload');
+      await new Promise(r => setTimeout(r, 1500));
+      bot.chat(`/loc delete TEST ${locName}`);
+      await bot.nextMessage(/deleted|removed/i, 6_000).catch(() => {});
+    }
   });
 
   test('Issue 4 parse: multi-word name is joined in the lookup', async () => {
