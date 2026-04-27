@@ -31,6 +31,9 @@ import org.bukkit.block.banner.Pattern;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BannerMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.entity.Player;
 import org.bukkit.profile.PlayerProfile;
 import ua.favn.baseManager.BaseManager;
 import ua.favn.baseManager.base.Base;
@@ -269,7 +272,7 @@ public class Pl3xmapManager extends Base {
     /**
      * Decode a Base64 textures value and extract the skin URL.
      */
-    private URL extractUrlFromTextureValue(String base64Value) {
+    static URL extractUrlFromTextureValue(String base64Value) {
         try {
             String json = new String(Base64.getDecoder().decode(base64Value));
             int httpStart = json.indexOf("http://textures.minecraft.net");
@@ -289,22 +292,63 @@ public class Pl3xmapManager extends Base {
 
     /**
      * Resolve a skin URL from the current profile snapshot without any network
-     * calls. This is safe to use on the main thread.
+     * calls. This is safe to use on the main thread. Uses Paper's direct
+     * ProfileProperty API to avoid serialize() format ambiguity across
+     * Paper/Purpur builds.
      */
     private URL getSkinUrlFromProfile(PlayerProfile profile) {
+        URL fromProperties = getSkinUrlFromPaperProperties(profile);
+        if (fromProperties != null) {
+            return fromProperties;
+        }
+
         try {
             URL direct = profile.getTextures().getSkin();
             if (direct != null) {
                 return direct;
             }
         } catch (Exception ignored) {
-            // fall through to serialized properties
+            // fall through to serialized fallback
         }
+
         return getSkinUrlFromSerializedProperties(profile);
     }
 
     /**
-     * Resolve a skin URL from serialized profile properties.
+     * Read texture properties via Paper's direct ProfileProperty API. This is
+     * the primary extraction path — it works regardless of how the underlying
+     * server build serializes profiles to YAML maps.
+     */
+    private URL getSkinUrlFromPaperProperties(PlayerProfile profile) {
+        if (!(profile instanceof com.destroystokyo.paper.profile.PlayerProfile paperProfile)) {
+            return null;
+        }
+        try {
+            for (com.destroystokyo.paper.profile.ProfileProperty prop : paperProfile.getProperties()) {
+                if (!"textures".equals(prop.getName())) {
+                    continue;
+                }
+                String value = prop.getValue();
+                if (value == null || value.isBlank()) {
+                    continue;
+                }
+                URL resolved = extractUrlFromTextureValue(value);
+                if (resolved != null) {
+                    return resolved;
+                }
+            }
+        } catch (Exception e) {
+            getPlugin().getLogger().warning("Failed to read Paper profile properties: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Last-resort fallback: parse skin URL from {@code profile.serialize()}.
+     * Paper builds normally serialize properties as {@code List<Map<String,
+     * String>>}, but the format is implementation-defined and has varied
+     * across versions, so this path is only used after Paper's direct API
+     * has been tried.
      */
     private URL getSkinUrlFromSerializedProperties(PlayerProfile profile) {
         try {
@@ -417,6 +461,62 @@ public class Pl3xmapManager extends Base {
         return "item:" + Integer.toHexString(head.hashCode());
     }
 
+    /**
+     * Show the player a chat preview of how a player_head item will resolve
+     * to a Pl3xmap icon. Used during lodestone+frame waypoint construction so
+     * the player sees up-front whether their chosen head will render with its
+     * actual face or fall back to the default icon. Runs synchronously — only
+     * inspects in-memory profile data, no network calls.
+     */
+    public void previewHeadIcon(ItemStack head, Player player) {
+        if (head == null || head.getType() != Material.PLAYER_HEAD) {
+            return;
+        }
+        if (!(head.getItemMeta() instanceof SkullMeta skullMeta)) {
+            return;
+        }
+        PlayerProfile profile = skullMeta.getOwnerProfile();
+        if (profile == null) {
+            player.sendMessage(Component.text("[BaseManager] Head icon preview: ", NamedTextColor.GRAY)
+                .append(Component.text("no owner profile on this head — map will use default icon", NamedTextColor.RED)));
+            return;
+        }
+
+        String name = profile.getName() == null ? "" : profile.getName();
+        String uuid = profile.getUniqueId() == null ? "<no uuid>" : profile.getUniqueId().toString();
+        int paperPropCount = 0;
+        if (profile instanceof com.destroystokyo.paper.profile.PlayerProfile paperProfile) {
+            paperPropCount = paperProfile.getProperties().size();
+        }
+
+        URL skinUrl = getSkinUrlFromProfile(profile);
+
+        Component header = Component.text("[BaseManager] Head icon preview", NamedTextColor.GRAY);
+        Component profileLine = Component.text("  profile: ", NamedTextColor.DARK_GRAY)
+            .append(Component.text("name='" + name + "' uuid=" + uuid + " paper-props=" + paperPropCount, NamedTextColor.GRAY));
+        player.sendMessage(header);
+        player.sendMessage(profileLine);
+
+        if (skinUrl != null) {
+            String hash16 = headKeyFromSkinUrl(skinUrl);
+            String iconKey = "basemanager_head_" + hash16;
+            boolean registered = registeredIcons.contains(iconKey);
+            player.sendMessage(Component.text("  ✓ skin URL extracted: ", NamedTextColor.GREEN)
+                .append(Component.text(skinUrl.toString(), NamedTextColor.AQUA)));
+            player.sendMessage(Component.text("  → icon key: ", NamedTextColor.DARK_GRAY)
+                .append(Component.text(iconKey, NamedTextColor.YELLOW))
+                .append(Component.text(registered ? " (already registered)" : " (will register on save)", NamedTextColor.GRAY)));
+            return;
+        }
+
+        player.sendMessage(Component.text("  ✗ could not extract skin URL synchronously", NamedTextColor.RED));
+        if (!name.isBlank()) {
+            player.sendMessage(Component.text("    will fall back to Mojang lookup for '" + name + "' on save", NamedTextColor.YELLOW));
+        } else {
+            player.sendMessage(Component.text("    no profile name available — map will use default icon", NamedTextColor.RED));
+        }
+    }
+
     private void ensureHeadIconRegisteredAsync(ItemStack head) {
         String pendingKey = getPendingHeadRegistrationKey(head);
         if (pendingKey != null && !pendingHeadRegistrations.add(pendingKey)) {
@@ -454,6 +554,15 @@ public class Pl3xmapManager extends Base {
         // getSkinUrl may block on Mojang API — this method must be async.
         URL skinUrl = getSkinUrl(head);
         if (skinUrl == null) {
+            int propCount = 0;
+            if (profile instanceof com.destroystokyo.paper.profile.PlayerProfile pp) {
+                propCount = pp.getProperties().size();
+            }
+            getPlugin().getLogger().warning(
+                "Could not resolve skin URL for head icon "
+                + "(profile name='" + profile.getName()
+                + "', uniqueId=" + profile.getUniqueId()
+                + ", paper-properties=" + propCount + ")");
             return false;
         }
 
