@@ -122,8 +122,13 @@ public class LodestoneListener extends Base implements Listener {
                 findSignForLodestone(attached), null);
             return;
         }
+        ItemStack frameItem = newItem.clone();
         reportConstructionProgress(event.getPlayer(), attached,
-            findSignForLodestone(attached), newItem.clone());
+            findSignForLodestone(attached), frameItem);
+        if (frameItem.getType() == Material.PLAYER_HEAD
+                && getPlugin().getPl3xmapManager() != null) {
+            getPlugin().getPl3xmapManager().previewHeadIcon(frameItem, event.getPlayer());
+        }
     }
 
     /**
