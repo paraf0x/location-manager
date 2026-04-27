@@ -7,6 +7,7 @@ import java.io.File;
 import java.net.URI;
 import java.net.URL;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ public class Pl3xmapManager extends Base {
 
     private boolean pl3xmapAvailable;
     private final Set<String> registeredIcons = new HashSet<>();
+    private final Set<String> pendingHeadRegistrations = Collections.synchronizedSet(new HashSet<>());
     private final File iconCacheDir;
 
     public Pl3xmapManager(BaseManager plugin) {
@@ -200,6 +202,9 @@ public class Pl3xmapManager extends Base {
                 if (headKey != null) {
                     return headKey;
                 }
+                // Head icon wasn't available in the registry yet. Queue a non-blocking
+                // registration so a follow-up refresh can pick the real face icon.
+                ensureHeadIconRegisteredAsync(iconItem);
             } else if (isBanner(iconItem.getType())) {
                 String bannerKey = getBannerIconKey(iconItem);
                 if (bannerKey != null && registeredIcons.contains(bannerKey)) {
@@ -233,14 +238,14 @@ public class Pl3xmapManager extends Base {
             return null;
         }
 
-        // Try the clean Bukkit API first
-        URL skinUrl = profile.getTextures().getSkin();
+        // Try non-blocking profile extraction first.
+        URL skinUrl = getSkinUrlFromProfile(profile);
         if (skinUrl != null) {
             return skinUrl;
         }
 
         // Profile might only have a name — complete it via Mojang API to get textures
-        if (profile.getName() != null) {
+        if (profile.getName() != null && !profile.getName().isBlank()) {
             try {
                 com.destroystokyo.paper.profile.PlayerProfile paperProfile =
                     Bukkit.createProfile(profile.getName());
@@ -258,28 +263,7 @@ public class Pl3xmapManager extends Base {
             }
         }
 
-        // Fall back: check serialized properties for raw Base64 texture data
-        try {
-            Map<String, Object> serialized = profile.serialize();
-            Object propsObj = serialized.get("properties");
-            if (propsObj instanceof List<?> propsList) {
-                for (Object entry : propsList) {
-                    if (entry instanceof Map<?, ?> propMap) {
-                        if (!"textures".equals(propMap.get("name"))) {
-                            continue;
-                        }
-                        String value = (String) propMap.get("value");
-                        if (value == null) {
-                            continue;
-                        }
-                        return extractUrlFromTextureValue(value);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            getPlugin().getLogger().warning("Failed to parse head texture: " + e.getMessage());
-        }
-        return null;
+        return getSkinUrlFromSerializedProperties(profile);
     }
 
     /**
@@ -301,6 +285,53 @@ public class Pl3xmapManager extends Base {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * Resolve a skin URL from the current profile snapshot without any network
+     * calls. This is safe to use on the main thread.
+     */
+    private URL getSkinUrlFromProfile(PlayerProfile profile) {
+        try {
+            URL direct = profile.getTextures().getSkin();
+            if (direct != null) {
+                return direct;
+            }
+        } catch (Exception ignored) {
+            // fall through to serialized properties
+        }
+        return getSkinUrlFromSerializedProperties(profile);
+    }
+
+    /**
+     * Resolve a skin URL from serialized profile properties.
+     */
+    private URL getSkinUrlFromSerializedProperties(PlayerProfile profile) {
+        try {
+            Map<String, Object> serialized = profile.serialize();
+            Object propsObj = serialized.get("properties");
+            if (propsObj instanceof List<?> propsList) {
+                for (Object entry : propsList) {
+                    if (!(entry instanceof Map<?, ?> propMap)) {
+                        continue;
+                    }
+                    if (!"textures".equals(propMap.get("name"))) {
+                        continue;
+                    }
+                    Object valueObj = propMap.get("value");
+                    if (!(valueObj instanceof String value) || value.isBlank()) {
+                        continue;
+                    }
+                    URL resolved = extractUrlFromTextureValue(value);
+                    if (resolved != null) {
+                        return resolved;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            getPlugin().getLogger().warning("Failed to parse head texture: " + e.getMessage());
+        }
+        return null;
     }
 
     /**
@@ -328,7 +359,7 @@ public class Pl3xmapManager extends Base {
         // Legacy fallback: name-based key (real player heads already
         // registered this way pre-fix).
         String name = profile.getName();
-        if (name != null) {
+        if (name != null && !name.isBlank()) {
             String nameKey = "basemanager_head_" + name.toLowerCase();
             if (registeredIcons.contains(nameKey)) {
                 return nameKey;
@@ -345,53 +376,96 @@ public class Pl3xmapManager extends Base {
      */
     private String headKeyFromProfileTextureUrl(PlayerProfile profile) {
         try {
-            URL url = profile.getTextures().getSkin();
-            if (url == null) {
-                return null;
-            }
-            String path = url.getPath();
-            int slash = path.lastIndexOf('/');
-            String hash = slash >= 0 ? path.substring(slash + 1) : path;
-            if (hash.isEmpty()) {
-                return null;
-            }
-            return hash.length() > 16 ? hash.substring(0, 16) : hash;
+            return headKeyFromSkinUrl(getSkinUrlFromProfile(profile));
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private String headKeyFromSkinUrl(URL skinUrl) {
+        if (skinUrl == null) {
+            return null;
+        }
+        String path = skinUrl.getPath();
+        int slash = path.lastIndexOf('/');
+        String hash = slash >= 0 ? path.substring(slash + 1) : path;
+        if (hash.isEmpty()) {
+            return null;
+        }
+        return hash.length() > 16 ? hash.substring(0, 16) : hash;
+    }
+
+    private String getPendingHeadRegistrationKey(ItemStack head) {
+        if (!(head.getItemMeta() instanceof SkullMeta skullMeta)) {
+            return null;
+        }
+        PlayerProfile profile = skullMeta.getOwnerProfile();
+        if (profile == null) {
+            return null;
+        }
+
+        String urlKey = headKeyFromProfileTextureUrl(profile);
+        if (urlKey != null) {
+            return "url:" + urlKey;
+        }
+
+        String name = profile.getName();
+        if (name != null && !name.isBlank()) {
+            return "name:" + name.toLowerCase();
+        }
+
+        return "item:" + Integer.toHexString(head.hashCode());
+    }
+
+    private void ensureHeadIconRegisteredAsync(ItemStack head) {
+        String pendingKey = getPendingHeadRegistrationKey(head);
+        if (pendingKey != null && !pendingHeadRegistrations.add(pendingKey)) {
+            return;
+        }
+
+        ItemStack copy = head.clone();
+        Bukkit.getScheduler().runTaskAsynchronously(getPlugin(), () -> {
+            try {
+                boolean registered = ensureHeadIconRegistered(copy);
+                if (registered) {
+                    Bukkit.getScheduler().runTask(getPlugin(), this::refreshMarkers);
+                }
+            } finally {
+                if (pendingKey != null) {
+                    pendingHeadRegistrations.remove(pendingKey);
+                }
+            }
+        });
     }
 
     /**
      * Download a player head skin, crop the face, and register with Pl3xmap.
      * Must be called from an async thread.
      */
-    private synchronized void ensureHeadIconRegistered(ItemStack head) {
+    private synchronized boolean ensureHeadIconRegistered(ItemStack head) {
         if (!(head.getItemMeta() instanceof SkullMeta skullMeta)) {
-            return;
+            return false;
         }
         PlayerProfile profile = skullMeta.getOwnerProfile();
         if (profile == null) {
-            return;
+            return false;
         }
 
         // getSkinUrl may block on Mojang API — this method must be async.
         URL skinUrl = getSkinUrl(head);
         if (skinUrl == null) {
-            return;
+            return false;
         }
 
         // Use the skin URL's hash as the cache key so different HDB heads
         // (which all share profile.name "HeadDatabase") produce different icons.
-        String urlPath = skinUrl.getPath();
-        int slash = urlPath.lastIndexOf('/');
-        String urlHash = slash >= 0 ? urlPath.substring(slash + 1) : urlPath;
-        if (urlHash.isEmpty()) {
-            return;
+        String keyName = headKeyFromSkinUrl(skinUrl);
+        if (keyName == null) {
+            return false;
         }
-        String keyName = (urlHash.length() > 16 ? urlHash.substring(0, 16) : urlHash);
         String iconKey = "basemanager_head_" + keyName;
         if (registeredIcons.contains(iconKey)) {
-            return;
+            return false;
         }
 
         try {
@@ -404,7 +478,7 @@ public class Pl3xmapManager extends Base {
                 // Download skin and crop face region (8,8 to 16,16 on a 64x64 skin)
                 BufferedImage skin = ImageIO.read(skinUrl);
                 if (skin == null) {
-                    return;
+                    return false;
                 }
                 BufferedImage faceCrop = skin.getSubimage(8, 8, 8, 8);
 
@@ -421,10 +495,12 @@ public class Pl3xmapManager extends Base {
                 IconImage iconImage = new IconImage(iconKey, face, "png");
                 Pl3xMap.api().getIconRegistry().register(iconKey, iconImage);
                 registeredIcons.add(iconKey);
+                return true;
             }
         } catch (Exception e) {
             getPlugin().getLogger().warning("Failed to register head icon: " + e.getMessage());
         }
+        return false;
     }
 
     // ── Banner rendering ─────────────────────────────────────────────────
