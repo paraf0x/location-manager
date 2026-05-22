@@ -21,6 +21,15 @@ export async function acquireServer(): Promise<McServer> {
     inheritStdio: true,
   });
 
+  // mineflayer/minecraft-protocol has no data for MC 26.1.x yet, so a bot
+  // cannot speak the 26.1.2 protocol natively. ViaVersion + ViaBackwards on
+  // the server translate protocols, so the bot connects as 1.21.9 and Via
+  // bridges it to the real 26.1.2 server. Pin every bot to that version.
+  const e2eBotVersion = process.env.E2E_BOT_VERSION ?? '1.21.9';
+  const createBotOrig = server.createBot.bind(server);
+  server.createBot = (username, options) =>
+    createBotOrig(username, { version: e2eBotVersion, ...options });
+
   console.log('[e2e] Starting Minecraft server...');
   await server.start();
   console.log('[e2e] Server is ready.');

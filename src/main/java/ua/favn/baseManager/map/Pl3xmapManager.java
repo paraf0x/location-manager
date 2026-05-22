@@ -250,16 +250,11 @@ public class Pl3xmapManager extends Base {
         // Profile might only have a name — complete it via Mojang API to get textures
         if (profile.getName() != null && !profile.getName().isBlank()) {
             try {
-                com.destroystokyo.paper.profile.PlayerProfile paperProfile =
-                    Bukkit.createProfile(profile.getName());
-                paperProfile.complete(true);
-                for (com.destroystokyo.paper.profile.ProfileProperty prop : paperProfile.getProperties()) {
-                    if ("textures".equals(prop.getName())) {
-                        URL resolved = extractUrlFromTextureValue(prop.getValue());
-                        if (resolved != null) {
-                            return resolved;
-                        }
-                    }
+                PlayerProfile completed = Bukkit.createPlayerProfile(profile.getName())
+                    .update().join();
+                URL resolved = completed.getTextures().getSkin();
+                if (resolved != null) {
+                    return resolved;
                 }
             } catch (Exception e) {
                 // Profile completion failed
@@ -292,16 +287,11 @@ public class Pl3xmapManager extends Base {
 
     /**
      * Resolve a skin URL from the current profile snapshot without any network
-     * calls. This is safe to use on the main thread. Uses Paper's direct
-     * ProfileProperty API to avoid serialize() format ambiguity across
-     * Paper/Purpur builds.
+     * calls. This is safe to use on the main thread. Uses Bukkit's
+     * {@link org.bukkit.profile.PlayerTextures} API, falling back to parsing
+     * {@code profile.serialize()} for builds where the textures view is empty.
      */
     private URL getSkinUrlFromProfile(PlayerProfile profile) {
-        URL fromProperties = getSkinUrlFromPaperProperties(profile);
-        if (fromProperties != null) {
-            return fromProperties;
-        }
-
         try {
             URL direct = profile.getTextures().getSkin();
             if (direct != null) {
@@ -312,35 +302,6 @@ public class Pl3xmapManager extends Base {
         }
 
         return getSkinUrlFromSerializedProperties(profile);
-    }
-
-    /**
-     * Read texture properties via Paper's direct ProfileProperty API. This is
-     * the primary extraction path — it works regardless of how the underlying
-     * server build serializes profiles to YAML maps.
-     */
-    private URL getSkinUrlFromPaperProperties(PlayerProfile profile) {
-        if (!(profile instanceof com.destroystokyo.paper.profile.PlayerProfile paperProfile)) {
-            return null;
-        }
-        try {
-            for (com.destroystokyo.paper.profile.ProfileProperty prop : paperProfile.getProperties()) {
-                if (!"textures".equals(prop.getName())) {
-                    continue;
-                }
-                String value = prop.getValue();
-                if (value == null || value.isBlank()) {
-                    continue;
-                }
-                URL resolved = extractUrlFromTextureValue(value);
-                if (resolved != null) {
-                    return resolved;
-                }
-            }
-        } catch (Exception e) {
-            getPlugin().getLogger().warning("Failed to read Paper profile properties: " + e.getMessage());
-        }
-        return null;
     }
 
     /**
@@ -484,16 +445,18 @@ public class Pl3xmapManager extends Base {
 
         String name = profile.getName() == null ? "" : profile.getName();
         String uuid = profile.getUniqueId() == null ? "<no uuid>" : profile.getUniqueId().toString();
-        int paperPropCount = 0;
-        if (profile instanceof com.destroystokyo.paper.profile.PlayerProfile paperProfile) {
-            paperPropCount = paperProfile.getProperties().size();
+        boolean hasTextures = false;
+        try {
+            hasTextures = !profile.getTextures().isEmpty();
+        } catch (Exception ignored) {
+            // textures view unavailable — leave false
         }
 
         URL skinUrl = getSkinUrlFromProfile(profile);
 
         Component header = Component.text("[BaseManager] Head icon preview", NamedTextColor.GRAY);
         Component profileLine = Component.text("  profile: ", NamedTextColor.DARK_GRAY)
-            .append(Component.text("name='" + name + "' uuid=" + uuid + " paper-props=" + paperPropCount, NamedTextColor.GRAY));
+            .append(Component.text("name='" + name + "' uuid=" + uuid + " has-textures=" + hasTextures, NamedTextColor.GRAY));
         player.sendMessage(header);
         player.sendMessage(profileLine);
 
@@ -554,15 +517,17 @@ public class Pl3xmapManager extends Base {
         // getSkinUrl may block on Mojang API — this method must be async.
         URL skinUrl = getSkinUrl(head);
         if (skinUrl == null) {
-            int propCount = 0;
-            if (profile instanceof com.destroystokyo.paper.profile.PlayerProfile pp) {
-                propCount = pp.getProperties().size();
+            boolean hasTextures = false;
+            try {
+                hasTextures = !profile.getTextures().isEmpty();
+            } catch (Exception ignored) {
+                // textures view unavailable — leave false
             }
             getPlugin().getLogger().warning(
                 "Could not resolve skin URL for head icon "
                 + "(profile name='" + profile.getName()
                 + "', uniqueId=" + profile.getUniqueId()
-                + ", paper-properties=" + propCount + ")");
+                + ", has-textures=" + hasTextures + ")");
             return false;
         }
 

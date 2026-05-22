@@ -376,4 +376,35 @@ describe('BaseManager E2E', () => {
     bot.chat('/loc delete BASE shareOne');
     await bot.nextMessage(/deleted|removed/i, 5_000).catch(() => {});
   });
+
+  test('Anvil search GUI: Search button in /loc gui opens an anvil window', async () => {
+    // At least one location so the browser GUI renders fully.
+    await asBot('loc save BASE anvilProbe');
+    await new Promise(r => setTimeout(r, 500));
+    bot.clearMessages();
+
+    bot.chat('/loc gui');
+    const menu = await bot.nextWindow(10_000);
+
+    // The "Search" button is a NAME_TAG; locate it by its display name.
+    const searchBtn = menu.findSlot(s => s.name === 'Search');
+    expect(
+      searchBtn,
+      `Search button missing. GUI slots: ${JSON.stringify(menu.filledSlots().map(s => s.name))}`,
+    ).toBeDefined();
+    expect(searchBtn!.item).toBe('minecraft:name_tag');
+
+    // Clicking Search invokes AnvilGUI.open(). The AnvilGUI library is bound
+    // to the server's NMS version: if the bundled wrapper does not cover the
+    // running server, .open() throws and no anvil window opens, so this click
+    // rejects on the nextWindow timeout.
+    // The bot connects via ViaBackwards (1.21.9 <-> 26.1.2): the window type
+    // survives protocol translation but the anvil title text does not, so we
+    // assert on the type only -- the anvil actually opening is the regression.
+    const anvil = await menu.clickSlot(searchBtn!.index);
+    expect(anvil.type, `expected an anvil window, got type "${anvil.type}"`).toContain('anvil');
+
+    await bot.closeWindow();
+    await asBot('loc delete BASE anvilProbe');
+  });
 });
