@@ -1,7 +1,7 @@
 name: BaseManager
 version: '${project.version}'
 main: ua.favn.baseManager.BaseManager
-api-version: '1.21'
+api-version: '26.3'
 description: Location and waypoint management plugin for Minecraft
 author: favn
 softdepend: [ProtocolLib, Pl3xMap]
